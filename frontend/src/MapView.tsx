@@ -4,45 +4,18 @@ import "leaflet/dist/leaflet.css";
 import "maplibre-gl/dist/maplibre-gl.css";
 import { loadBasemap } from "./basemap";
 import { pickTileStyle } from "./mapStyle";
-import type { CardItem, Course, PipelineResponse, Spot, Transport } from "./types";
+import type { MapProps } from "./mapTypes";
 import {
-  CATEGORY_META, CITY_VIEW_MAX_ZOOM, PROVINCE_VIEW_MAX_ZOOM, earliestShowtime, escapeHtml, groupSpots, travelLabel,
-} from "./geo";
-
-interface Props {
-  data: PipelineResponse | null;
-  items: CardItem[]; // 카테고리 필터 적용된 스팟
-  course: Course | null; // 표시할 코스(토글 on일 때만 전달)
-  transport: Transport;
-  focusId: string | null; // 호버/선택된 스팟
-  selectedId: string | null;
-  onSelect: (id: string) => void;
-  padBottom?: number; // 모바일 바텀시트에 가려지는 높이(px). 지도 맞춤 시 여백으로 쓴다
-  compact?: boolean; // 좁은 화면: 배지를 작게(개수+지역명만)
-}
+  LEG_SIZE, ORDER_ANCHOR, ORDER_SIZE, PIN_ANCHOR, PIN_SIZE, legHtml, orderHtml, pinHtml, regionHtml, regionSize,
+} from "./markerHtml";
+import { CITY_VIEW_MAX_ZOOM, PROVINCE_VIEW_MAX_ZOOM, escapeHtml, groupSpots, travelLabel } from "./geo";
 
 const KOREA_CENTER: L.LatLngTuple = [36.4, 127.9];
 
-function pinIcon(spot: Spot, focused: boolean): L.DivIcon {
-  const meta = CATEGORY_META[spot.category];
-  const live = spot.schedule.live_status === "OPEN_NOW";
-  let badge = "";
-  if (spot.category === "FLEA_MARKET" && live) badge = `<span class="pp-badge">오늘열림</span>`;
-  if (spot.category === "NEW_OPEN" && live) badge = `<span class="pp-badge pp-live">LIVE OPEN</span>`;
-  if (spot.category === "MOVIE") {
-    const t = earliestShowtime(spot);
-    if (t) badge = `<span class="pp-badge pp-time">🎬 ${escapeHtml(t)}</span>`;
-  }
-  const pulse = spot.category === "FESTIVAL" || (spot.category === "NEW_OPEN" && live) ? " pp-pulse" : "";
-  const html =
-    `<div class="pp-pin${pulse}${focused ? " pp-bounce" : ""}" style="--c:${meta.color}">` +
-    `<span class="pp-emoji">${meta.emoji}</span>${badge}</div>`;
-  return L.divIcon({ className: "pp-icon", html, iconSize: [40, 40], iconAnchor: [20, 40] });
-}
-
+/** Leaflet 지도(OpenFreeMap 벡터 / 대체 OSM 타일). 카카오맵 키가 없거나 실패했을 때 쓰인다. */
 export default function MapView({
   data, items, course, transport, focusId, selectedId, onSelect, padBottom = 0, compact = false,
-}: Props) {
+}: MapProps) {
   const elRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<L.Map | null>(null);
   const markerLayer = useRef(L.layerGroup());
@@ -86,15 +59,13 @@ export default function MapView({
 
     if (level !== "pin") {
       for (const g of groupSpots(spots, level)) {
-        const rep = CATEGORY_META[g.representative.category];
-        const repLine = compact ? "" : `<div class="pp-region-rep">${rep.emoji} ${escapeHtml(g.representative.title)}</div>`;
-        const html =
-          `<div class="pp-region${compact ? " compact" : ""}"><div class="pp-region-count">${g.count}</div>` +
-          `<div class="pp-region-name">${escapeHtml(g.label)}</div>${repLine}</div>`;
-        const size: L.PointTuple = compact ? [72, 44] : [120, 64];
+        const size = regionSize(compact);
         L.marker([g.lat, g.lng], {
-          icon: L.divIcon({ className: "pp-icon", html, iconSize: size, iconAnchor: [size[0] / 2, size[1] / 2] }),
+          icon: L.divIcon({
+            className: "pp-icon", html: regionHtml(g, compact), iconSize: size, iconAnchor: [size[0] / 2, size[1] / 2],
+          }),
           title: `${g.label} ${g.count}곳`,
+          zIndexOffset: g.count, // 개수가 많은 배지를 위로 (가까운 배지가 덮어도 큰 쪽이 눌린다)
         })
           // 시·도 배지는 시·군 단계로, 시·군 배지는 개별 핀 단계로 확대
           .on("click", () => map.setView([g.lat, g.lng], level === "province" ? PROVINCE_VIEW_MAX_ZOOM + 2 : CITY_VIEW_MAX_ZOOM + 2))
@@ -104,10 +75,11 @@ export default function MapView({
     }
 
     for (const spot of spots) {
+      const focused = spot.id === focusId || spot.id === selectedId;
       L.marker([spot.location.lat, spot.location.lng], {
-        icon: pinIcon(spot, spot.id === focusId || spot.id === selectedId),
+        icon: L.divIcon({ className: "pp-icon", html: pinHtml(spot, focused), iconSize: PIN_SIZE, iconAnchor: PIN_ANCHOR }),
         title: spot.title,
-        zIndexOffset: spot.id === focusId || spot.id === selectedId ? 1000 : 0,
+        zIndexOffset: focused ? 1000 : 0,
       })
         .bindTooltip(escapeHtml(spot.title), { direction: "top", offset: [0, -36] })
         .on("click", () => onSelect(spot.id))
@@ -147,12 +119,7 @@ export default function MapView({
       const ll: L.LatLngTuple = [spot.location.lat, spot.location.lng];
       pts.push(ll);
       L.marker(ll, {
-        icon: L.divIcon({
-          className: "pp-icon",
-          html: `<div class="pp-order">${idx + 1}</div>`,
-          iconSize: [28, 28],
-          iconAnchor: [40, 52], // 핀 머리의 왼쪽 위 (이모지·뱃지를 가리지 않게)
-        }),
+        icon: L.divIcon({ className: "pp-icon", html: orderHtml(idx + 1), iconSize: ORDER_SIZE, iconAnchor: ORDER_ANCHOR }),
         interactive: false,
         zIndexOffset: 2000,
       }).addTo(layer);
@@ -160,10 +127,8 @@ export default function MapView({
       if (prev && stop.distance_from_prev_km != null) {
         L.marker([(prev[0] + ll[0]) / 2, (prev[1] + ll[1]) / 2], {
           icon: L.divIcon({
-            className: "pp-icon",
-            html: `<div class="pp-leg">${escapeHtml(travelLabel(stop.distance_from_prev_km, transport))}</div>`,
-            iconSize: [90, 22],
-            iconAnchor: [45, 11],
+            className: "pp-icon", html: legHtml(travelLabel(stop.distance_from_prev_km, transport)),
+            iconSize: LEG_SIZE, iconAnchor: [LEG_SIZE[0] / 2, LEG_SIZE[1] / 2],
           }),
           interactive: false,
         }).addTo(layer);

@@ -133,6 +133,10 @@ button:focus-visible, input:focus-visible, a:focus-visible { outline: 2px solid 
 .app.mobile .pbody { padding: 9px 10px 11px; }
 .app.mobile .pbody strong { font-size: 13.5px; }
 
+/* ---- 카카오맵 오버레이: 좌표 위치에 크기 0인 기준점을 두고 내용을 iconAnchor만큼 비껴 놓는다 ---- */
+.k-anchor { position: relative; width: 0; height: 0; }
+.k-box { position: absolute; }
+
 /* ---- 지도 마커 ---- */
 .pp-icon { background: none; border: 0; }
 .pp-pin { position: relative; width: 40px; height: 40px; border-radius: 50% 50% 50% 0; transform: rotate(-45deg); background: var(--c); box-shadow: 0 2px 6px rgba(0, 0, 0, .35); display: grid; place-items: center; }

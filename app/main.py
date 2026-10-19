@@ -100,6 +100,14 @@ def reroute_endpoint(req: RerouteRequest):
     return _call(reroute, req)
 
 
+@api.get("/config")
+def public_config(response: Response):
+    """화면이 필요로 하는 공개 설정. 카카오맵 JavaScript 키는 원래 브라우저에 공개되는 키이므로 이것만 내보낸다
+    (다른 키는 절대 포함하지 않는다). 키가 없으면 null이고 화면은 OpenFreeMap으로 동작한다."""
+    response.headers["Cache-Control"] = "public, max-age=300"
+    return {"kakao_js_key": get_settings().kakao_js_key or None}
+
+
 @api.get("/health")
 def health(response: Response):
     """배포 설정 진단. 키 값은 싣지 않고 형태(종류·길이·공백 여부 등)와 DB 접속 결과만 알려 준다."""

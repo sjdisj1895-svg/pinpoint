@@ -262,9 +262,12 @@ interface PanelProps {
   onReroute: (text: string, weather?: Weather) => void;
   onExplore: () => void;
   showChips: boolean; // 모바일은 지도 위 플로팅 칩을 쓴다
+  mapEngine: "kakao" | "leaflet"; // 쓰고 있는 지도에 맞는 출처를 표기한다
 }
 
-export default function Panel({ state, dispatch, items, shown, courses, onAsk, onSample, onReroute, onExplore, showChips }: PanelProps) {
+export default function Panel({
+  state, dispatch, items, shown, courses, onAsk, onSample, onReroute, onExplore, showChips, mapEngine,
+}: PanelProps) {
   return (
     <div className="panel">
       <Brand state={state} onExplore={onExplore} />
@@ -286,10 +289,15 @@ export default function Panel({ state, dispatch, items, shown, courses, onAsk, o
       )}
       {/* 모바일은 지도 위 표기가 시트에 가려져, 이용 조건에 맞게 시트 안에도 출처를 둔다 */}
       <footer className="credits">
-        지도 ©{" "}
-        <a href="https://openfreemap.org" target="_blank" rel="noopener noreferrer">OpenFreeMap</a> ©{" "}
-        <a href="https://www.openmaptiles.org/" target="_blank" rel="noopener noreferrer">OpenMapTiles</a> · 데이터 ©{" "}
-        <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener noreferrer">OpenStreetMap</a> 기여자
+        {mapEngine === "kakao" ? (
+          <>지도 © <a href="https://map.kakao.com" target="_blank" rel="noopener noreferrer">Kakao</a></>
+        ) : (
+          <>
+            지도 © <a href="https://openfreemap.org" target="_blank" rel="noopener noreferrer">OpenFreeMap</a> ©{" "}
+            <a href="https://www.openmaptiles.org/" target="_blank" rel="noopener noreferrer">OpenMapTiles</a> · 데이터 ©{" "}
+            <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener noreferrer">OpenStreetMap</a> 기여자
+          </>
+        )}{" "}
         · 사진 한국관광공사
       </footer>
     </div>

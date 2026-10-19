@@ -45,6 +45,7 @@ Node가 PATH에 없으면 `C:\Program Files\nodejs`를 PATH에 추가하세요.
 | `DATA_GO_KR_KEY` | data.go.kr — 한국관광공사 국문 관광정보(TourAPI 4.0), 전국문화축제표준데이터 활용신청 | Connector A, B (Decoding 키) |
 | `KOBIS_KEY` | kobis.or.kr/kobisopenapi | Connector C 박스오피스 |
 | `KAKAO_REST_KEY` | developers.kakao.com (카카오맵/로컬 사용 설정) | 영화관 검색, 지오코딩 |
+| `KAKAO_JS_KEY` | 같은 앱의 JavaScript 키 + Web 플랫폼에 사이트 주소 등록 | 지도를 카카오맵으로 표시 (비면 OpenFreeMap) |
 | `NAVER_CLIENT_ID/SECRET`, `NAVER_API_MODE` | 네이버 클라우드 API Hub(`hub`, 기본) 또는 developers.naver.com(`developers`)의 검색 API | Connector D |
 | `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY` | supabase.com | 공간 DB (서버 전용 키) |
 | `ADMIN_TOKEN` | 직접 생성 | `POST /harvest` 보호 (비우면 비활성) |
@@ -75,7 +76,7 @@ Node가 PATH에 없으면 `C:\Program Files\nodejs`를 PATH에 추가하세요.
 
 1. **코드를 GitHub에 올립니다.** 지금 폴더는 git 저장소가 아니므로 `git init` → `git add .` → `git commit -m "init"` 후 GitHub 저장소를 만들어 push합니다. `.env`는 `.gitignore`에 들어 있어 올라가지 않습니다 (커밋 전에 `git status`에 `.env`가 없는지 꼭 확인하세요).
 2. Vercel 대시보드 → **Add New → Project** → 저장소 선택. Framework는 FastAPI로 자동 인식되고, 빌드 명령은 `vercel.json`에서 읽습니다. 아직 **Deploy를 누르지 마세요.**
-3. **Environment Variables**에 `.env` 내용을 넣습니다. 입력란에 `.env` 파일 내용을 통째로 붙여 넣으면 한 번에 등록됩니다. 비어 있는 값은 빼고, `MOIS_FESTIVAL_FILE`(로컬 파일 경로)은 넣지 않습니다.
+3. **Environment Variables**에 `.env` 내용을 넣습니다 (`KAKAO_JS_KEY`도 포함. 카카오 앱의 Web 플랫폼에 배포 주소를 등록해야 지도가 뜹니다). 입력란에 `.env` 파일 내용을 통째로 붙여 넣으면 한 번에 등록됩니다. 비어 있는 값은 빼고, `MOIS_FESTIVAL_FILE`(로컬 파일 경로)은 넣지 않습니다.
 4. **Deploy**. 배포 뒤 `https://<프로젝트>.vercel.app/` 이 열리고 경남 둘러보기가 나오면 정상입니다.
 
 CLI로 올리려면: `npm i -g vercel` → `vercel login` → 프로젝트 폴더에서 `vercel` (미리보기), `vercel --prod` (운영). `.vercelignore`가 `.env`와 로컬 산출물을 올리지 않게 막습니다.
@@ -95,7 +96,8 @@ CLI로 올리려면: `npm i -g vercel` → `vercel login` → 프로젝트 폴�
 - **TourAPI 링크:** 항목의 `source_url`은 공식 상세 페이지가 아닌 지도 검색 링크입니다.
 - **전국문화축제표준데이터는 파일 데이터입니다.** API가 아니라서 data.go.kr에서 CSV를 내려받아 `data/festival_standard.csv`(또는 `MOIS_FESTIVAL_FILE`)에 두어야 합니다. 없으면 이 소스만 건너뛰고 TourAPI 축제로 동작합니다. 컬럼명은 한글/영문 별칭을 모두 허용하며, 실제 내려받은 파일로 동작을 확인했습니다.
 - **응답 속도:** `/pipeline` 한 번에 30~45초 정도입니다 (T1 약 5초, T2 약 10초, T3 약 15초). T2는 판단만 출력하게 줄였고, 후보는 카테고리별 8개·총 24개로 제한합니다. OpenAI 호환 호출은 추론 강도를 낮추는 `output_config.effort=low`를 보내고(`API_EFFORT`, 서비스가 거부하면 자동 제외), 게이트웨이 504를 피하려고 스트리밍을 씁니다 (`API_STREAM`). 추론 강도를 낮추면 후보를 더 엄격하게 거를 수 있습니다.
-- **지도:** Leaflet 위에 OpenFreeMap 벡터 지도(MapLibre)를 얹었습니다. 키·가입이 필요 없고 지명은 한글 우선으로 표시합니다. 스타일은 `frontend/src/mapStyle.ts`의 `DEFAULT_TILE`(positron/liberty/bright)에서 고르고, 주소에 `?tiles=liberty`를 붙여 미리 비교할 수 있습니다. WebGL을 못 쓰는 기기에서는 OSM 타일로 자동 대체됩니다. OpenFreeMap·OpenStreetMap 출처 표기는 지도와 패널 아래에 두었으니 지우지 마세요. 카카오/네이버 지도로 바꾸려면 `MapView.tsx`와 `basemap.ts`를 교체하면 됩니다. (CARTO 기본 지도는 이제 API 키가 필요해 쓰지 않습니다.)
+- **지도 엔진 선택:** `KAKAO_JS_KEY`가 있으면 **카카오맵**을 쓰고(`KakaoMapView.tsx`), 없거나 불러오지 못하면(키·도메인 설정 오류, 광고 차단 등) 자동으로 아래 OpenFreeMap 지도로 되돌아갑니다. 카카오맵은 앱 설정의 **Web 플랫폼에 접속 주소를 등록**한 곳에서만 뜹니다 (`http://localhost:8000`, 배포 주소 등. `127.0.0.1`은 다른 주소로 취급됩니다). 주소에 `?map=leaflet`을 붙이면 OpenFreeMap을 강제로 볼 수 있습니다. 카카오 JavaScript 키는 브라우저에 공개되는 키라서 `/api/config`로 이 키 하나만 화면에 전달합니다. 카카오맵을 쓸 때는 카카오 로고와 출처 표기를 지우지 마세요.
+- **OpenFreeMap 지도:** Leaflet 위에 OpenFreeMap 벡터 지도(MapLibre)를 얹었습니다. 키·가입이 필요 없고 지명은 한글 우선으로 표시합니다. 스타일은 `frontend/src/mapStyle.ts`의 `DEFAULT_TILE`(positron/liberty/bright)에서 고르고, 주소에 `?tiles=liberty`를 붙여 미리 비교할 수 있습니다. WebGL을 못 쓰는 기기에서는 OSM 타일로 자동 대체됩니다. OpenFreeMap·OpenStreetMap 출처 표기는 지도와 패널 아래에 두었으니 지우지 마세요. 카카오/네이버 지도로 바꾸려면 `MapView.tsx`와 `basemap.ts`를 교체하면 됩니다. (CARTO 기본 지도는 이제 API 키가 필요해 쓰지 않습니다.)
 - **현재 위치 기반 재검색 없음:** T5 후보는 최초 T2 결과 안에서만 고릅니다.
 
 ## 테스트

@@ -73,5 +73,6 @@ def llm_report() -> dict[str, Any]:
 def keys_present(s: Settings) -> dict[str, bool]:
     return {
         "data_go_kr": bool(s.data_go_key), "kobis": bool(s.kobis_key), "kakao": bool(s.kakao_rest_key),
+        "kakao_js": bool(s.kakao_js_key),
         "naver": bool(s.naver_client_id and s.naver_client_secret), "admin_token": bool(s.admin_token),
     }

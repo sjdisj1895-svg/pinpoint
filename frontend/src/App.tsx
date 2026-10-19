@@ -3,6 +3,7 @@ import { fetchExplore, fetchPipeline, fetchReroute } from "./api";
 import type { Weather } from "./types";
 import BottomSheet from "./BottomSheet";
 import { buildCards, filterByPeriod, sortItems } from "./geo";
+import KakaoMapView from "./KakaoMapView";
 import MapView from "./MapView";
 import { MOCK } from "./mock";
 import Panel, { CategoryChips } from "./Panel";
@@ -35,9 +36,30 @@ function useIsMobile(): boolean {
   return m;
 }
 
+/** 서버가 알려 주는 공개 설정(카카오맵 JavaScript 키). 실패하거나 키가 없으면 null → OpenFreeMap 지도 */
+function useMapConfig(): { loading: boolean; kakaoKey: string | null } {
+  const [cfg, setCfg] = useState<{ loading: boolean; kakaoKey: string | null }>({ loading: true, kakaoKey: null });
+  useEffect(() => {
+    let alive = true;
+    fetch("/api/config")
+      .then((r) => (r.ok ? r.json() : null))
+      .then((c) => alive && setCfg({ loading: false, kakaoKey: c?.kakao_js_key ?? null }))
+      .catch(() => alive && setCfg({ loading: false, kakaoKey: null }));
+    return () => {
+      alive = false;
+    };
+  }, []);
+  return cfg;
+}
+
 export default function App() {
   const [state, dispatch] = useReducer(reducer, initialState);
   const mobile = useIsMobile();
+  const mapCfg = useMapConfig();
+  const [kakaoFailed, setKakaoFailed] = useState(false); // 카카오맵이 뜨지 않으면 true → OpenFreeMap으로 대체
+  // 주소의 ?map=leaflet 으로 카카오맵 대신 OpenFreeMap을 강제로 볼 수 있다 (비교·문제 확인용)
+  const forceLeaflet = new URLSearchParams(window.location.search).get("map") === "leaflet";
+  const mapEngine: "kakao" | "leaflet" = !forceLeaflet && mapCfg.kakaoKey && !kakaoFailed ? "kakao" : "leaflet";
 
   // 카테고리 → 시기 필터 → 정렬 순으로 적용한 전체 결과 (지도에는 이 전체가, 목록에는 "더보기" 단위로 보인다)
   const items = useMemo(() => {
@@ -120,21 +142,27 @@ export default function App() {
       onReroute={onReroute}
       onExplore={onExplore}
       showChips={!mobile}
+      mapEngine={mapEngine}
     />
   );
 
-  const map = (
-    <MapView
-      data={state.data}
-      items={items}
-      course={course}
-      transport={state.data?.t1.user_persona.transport ?? "WALK"}
-      focusId={state.hoveredId ?? state.selectedId}
-      selectedId={state.selectedId}
-      onSelect={onSelect}
-      padBottom={mobile ? Math.round(window.innerHeight * 0.5) : 0}
-      compact={mobile}
-    />
+  const mapProps = {
+    data: state.data,
+    items,
+    course,
+    transport: state.data?.t1.user_persona.transport ?? ("WALK" as const),
+    focusId: state.hoveredId ?? state.selectedId,
+    selectedId: state.selectedId,
+    onSelect,
+    padBottom: mobile ? Math.round(window.innerHeight * 0.5) : 0,
+    compact: mobile,
+  };
+  const map = mapCfg.loading ? (
+    <div className="map" aria-busy="true" aria-label="지도를 불러오는 중" />
+  ) : mapEngine === "kakao" ? (
+    <KakaoMapView {...mapProps} appKey={mapCfg.kakaoKey!} onUnavailable={() => setKakaoFailed(true)} />
+  ) : (
+    <MapView {...mapProps} />
   );
 
   if (mobile) {

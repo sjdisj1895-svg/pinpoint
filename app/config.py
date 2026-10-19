@@ -14,6 +14,7 @@ class Settings:
     mois_festival_file: str = "data/festival_standard.csv"
     kobis_key: str = ""
     kakao_rest_key: str = ""
+    kakao_js_key: str = ""  # 카카오맵 JavaScript 키 (브라우저에 공개되는 키. 등록한 도메인에서만 동작)
     naver_client_id: str = ""
     naver_client_secret: str = ""
     naver_api_mode: str = "hub"  # hub(네이버 클라우드 API Hub) | developers(네이버 개발자센터)
@@ -39,6 +40,7 @@ def load_settings(env: dict[str, str] | None = None) -> Settings:
         mois_festival_file=e.get("MOIS_FESTIVAL_FILE") or "data/festival_standard.csv",
         kobis_key=e.get("KOBIS_KEY", ""),
         kakao_rest_key=e.get("KAKAO_REST_KEY", ""),
+        kakao_js_key=e.get("KAKAO_JS_KEY", "").strip(),
         naver_client_id=e.get("NAVER_CLIENT_ID", ""),
         naver_client_secret=e.get("NAVER_CLIENT_SECRET", ""),
         naver_api_mode=(e.get("NAVER_API_MODE") or "hub").strip().lower(),
