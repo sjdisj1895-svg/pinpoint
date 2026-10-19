@@ -107,6 +107,64 @@ export function sortItems(items: CardItem[], sort: SortKey, center?: { lat: numb
   return out; // RECOMMEND는 buildCards의 순서(점수 → 신뢰도) 그대로
 }
 
+// ---------- 키워드 검색 · 지역 필터 (AI 추천 결과를 화면에서 바로 거를 때. 서버 app/explore.py와 같은 규칙) ----------
+// 분류 이름으로도 찾을 수 있게(예: "축제", "영화관", "카페") 분류별 동의어를 검색 대상에 포함한다
+const CATEGORY_WORDS: Record<Category, string> = {
+  FESTIVAL: "지역축제 축제 행사 페스티벌",
+  FLEA_MARKET: "플리마켓 팝업 마켓 시장 벼룩시장",
+  MOVIE: "상영영화 영화 영화관 극장 시네마",
+  TRAVEL_SPOT: "여행지 관광 명소 여행 볼거리",
+  NEW_OPEN: "실시간오픈 신상 오픈 가오픈 카페 매장",
+};
+const MAX_TOKENS = 5;
+
+/** 공백으로 나눈 검색어(소문자). 모든 단어가 맞아야 한다(AND). 빈 입력이면 [] */
+export function tokenize(q: string): string[] {
+  return q.toLowerCase().split(/\s+/).filter(Boolean).slice(0, MAX_TOKENS);
+}
+
+const compact = (s: string) => s.toLowerCase().replace(/\s+/g, ""); // '소양강 스카이워크'와 '소양강스카이'가 맞게 공백 제거
+
+/** 모든 검색어가 이름·요약/태그/추천 사유·주소/지역/분류 중 어딘가에 있으면 true */
+export function matchesQuery(item: CardItem, tokens: string[]): boolean {
+  if (!tokens.length) return true;
+  const { spot } = item;
+  const hay = compact(
+    [
+      spot.title, spot.subtitle, ...spot.attributes.vibe_tags, item.why ?? "",
+      spot.location.address, spot.location.region_tag, CATEGORY_WORDS[spot.category],
+    ].join(" "),
+  );
+  return tokens.every((t) => hay.includes(compact(t)));
+}
+
+/** '경남 진주시' → '진주시' (시·군 단위 지역 필터에 쓰는 이름) */
+export function cityOf(spot: Spot): string {
+  const parts = spot.location.region_tag.split(/\s+/).filter(Boolean);
+  return parts[1] ?? parts[0] ?? "";
+}
+
+export function filterByQuery(items: CardItem[], q: string): CardItem[] {
+  const tokens = tokenize(q);
+  return tokens.length ? items.filter((i) => matchesQuery(i, tokens)) : items;
+}
+
+export function filterByRegion(items: CardItem[], region: string): CardItem[] {
+  return region ? items.filter((i) => cityOf(i.spot) === region) : items;
+}
+
+/** 시·군별 개수(많은 순). 지역 필터를 걸기 전 목록으로 만들어야 다른 지역으로 바로 바꿔 볼 수 있다 */
+export function regionFacets(items: CardItem[]): { name: string; count: number }[] {
+  const counts = new Map<string, number>();
+  for (const i of items) {
+    const c = cityOf(i.spot);
+    if (c) counts.set(c, (counts.get(c) ?? 0) + 1);
+  }
+  return [...counts.entries()]
+    .map(([name, count]) => ({ name, count }))
+    .sort((a, b) => b.count - a.count || a.name.localeCompare(b.name, "ko"));
+}
+
 // ---------- 지도: 줌 단계별 집계 ----------
 export interface SpotGroup {
   key: string;

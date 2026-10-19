@@ -11,4 +11,5 @@ export interface MapProps {
   onSelect: (id: string) => void;
   padBottom?: number; // 모바일 바텀시트에 가려지는 높이(px). 지도 맞춤 시 여백으로 쓴다
   compact?: boolean; // 좁은 화면: 배지를 작게(개수+지역명만)
+  fitKey?: string; // "키워드|시·군". 필터가 걸려 있으면 지도를 결과(핀들)에 맞추고, "|"이면 원래 탐색 반경에 맞춘다
 }

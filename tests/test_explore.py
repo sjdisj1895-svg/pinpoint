@@ -86,10 +86,102 @@ def test_explore_queries_future_dates_only_for_events():
     future = [c for c in store.calls if c[3] is not None]
     assert len(today) == 18 and len(future) == 18 * len(explore_mod.FUTURE_OFFSETS)
     assert all(set(c[3]) == {"FESTIVAL", "FLEA_MARKET"} for c in future)  # 미래 조회는 행사류만
+
+
+def test_filters_run_on_the_cached_pool_without_new_db_queries():
     explore_mod._cache.clear()
-    store2 = FakeStore(lambda lat, lng: [])
-    explore_mod.explore(store2, "경남", TARGET, categories={"MOVIE"})
-    assert len(store2.calls) == 18  # 행사류를 요청하지 않으면 미래 조회도 없다
+    store = FakeStore(lambda lat, lng: [db_row(1)])
+    explore_mod.explore(store, "경남", TARGET)
+    n = len(store.calls)
+    explore_mod.explore(store, "경남", TARGET, q="유등")
+    explore_mod.explore(store, "경남", TARGET, region="진주시", categories={"MOVIE"})
+    explore_mod.explore(store, "경남", TARGET, q="없는말", limit=5)
+    assert len(store.calls) == n  # 검색·지역·분류는 캐시된 목록 위에서 메모리로만 처리
+
+
+# ---------- 키워드 검색 · 지역 필터 ----------
+def pool_of(*rows):
+    spots = [row_to_spot(r, TARGET) for r in rows]
+    return explore_mod.Pool("경남", {"lat": 35.2, "lng": 128.3}, spots)
+
+
+def titles(result):
+    return [s["title"] for s in result["spots"]]
+
+
+def test_tokenize_is_lowercase_and_capped():
+    assert explore_mod.tokenize("  진주   Night  ") == ["진주", "night"]
+    assert explore_mod.tokenize("") == [] and explore_mod.tokenize("   ") == []
+    assert len(explore_mod.tokenize("a b c d e f g")) == explore_mod.MAX_TOKENS
+
+
+def test_keyword_matches_title_address_and_category_words_with_and_semantics():
+    pool = pool_of(
+        db_row(1, title="진주 남강 유등축제", tag="경남 진주시"),
+        db_row(2, title="통영 케이블카", tag="경남 통영시", category="TRAVEL_SPOT", start=None, end=None),
+        db_row(3, title="CGV 창원", tag="경남 창원시", category="MOVIE", start=None, end=None),
+    )
+    assert titles(explore_mod.search_pool(pool, "유등")) == ["진주 남강 유등축제"]  # 이름
+    assert titles(explore_mod.search_pool(pool, "통영시")) == ["통영 케이블카"]  # 주소·지역
+    assert titles(explore_mod.search_pool(pool, "영화관")) == ["CGV 창원"]  # 분류 이름으로도 찾는다
+    assert titles(explore_mod.search_pool(pool, "축제")) == ["진주 남강 유등축제"]
+    assert titles(explore_mod.search_pool(pool, "진주 유등")) == ["진주 남강 유등축제"]  # 모든 단어가 맞아야 한다
+    assert explore_mod.search_pool(pool, "진주 케이블카")["spots"] == []  # AND: 한쪽만 맞으면 제외
+    assert explore_mod.search_pool(pool, "없는검색어")["total"] == 0
+
+
+def test_keyword_ignores_spaces_and_case():
+    pool = pool_of(db_row(1, title="소양강 스카이워크", tag="경남 진주시"), db_row(2, title="Sky Garden", tag="경남 김해시"))
+    assert titles(explore_mod.search_pool(pool, "소양강스카이")) == ["소양강 스카이워크"]
+    assert titles(explore_mod.search_pool(pool, "스카이 워크")) == ["소양강 스카이워크"]
+    assert titles(explore_mod.search_pool(pool, "SKY GARDEN")) == ["Sky Garden"]
+
+
+def test_title_matches_rank_above_address_matches():
+    pool = pool_of(
+        db_row(1, title="가야 박물관", tag="경남 진주시", confidence=0.9),  # 이름에 '진주'가 없고 주소에만 있음
+        db_row(2, title="진주성", tag="경남 통영시", confidence=0.5),  # 이름에 '진주'
+    )
+    assert titles(explore_mod.search_pool(pool, "진주")) == ["진주성", "가야 박물관"]
+
+
+def test_region_filter_and_facets_are_counted_before_the_region_filter():
+    pool = pool_of(
+        db_row(1, title="축제A", tag="경남 진주시"), db_row(2, title="축제B", tag="경남 진주시"),
+        db_row(3, title="축제C", tag="경남 통영시"),
+        db_row(4, title="관광D", tag="경남 통영시", category="TRAVEL_SPOT", start=None, end=None),
+    )
+    all_ = explore_mod.search_pool(pool)
+    assert {r["name"]: r["count"] for r in all_["regions"]} == {"진주시": 2, "통영시": 2}
+    jinju = explore_mod.search_pool(pool, region="진주시")
+    assert titles(jinju) == ["축제A", "축제B"] and jinju["total"] == 2
+    assert {r["name"] for r in jinju["regions"]} == {"진주시", "통영시"}  # 다른 지역으로 바로 바꿔 볼 수 있다
+    with_q = explore_mod.search_pool(pool, q="축제")  # 키워드를 걸면 지역별 개수도 그 결과 기준
+    assert {r["name"]: r["count"] for r in with_q["regions"]} == {"진주시": 2, "통영시": 1}
+    assert explore_mod.search_pool(pool, region="없는시")["spots"] == []
+
+
+def test_category_filter_and_total_before_limit():
+    rows = [db_row(i, title=f"관광{i}", category="TRAVEL_SPOT", start=None, end=None) for i in range(1, 8)]
+    pool = pool_of(*rows, db_row(20, title="축제", tag="경남 진주시"))
+    only_travel = explore_mod.search_pool(pool, categories={"TRAVEL_SPOT"})
+    assert only_travel["total"] == 7 and all(s["category"] == "TRAVEL_SPOT" for s in only_travel["spots"])
+    limited = explore_mod.search_pool(pool, q="관광", limit=3)
+    assert limited["count"] == 3 and limited["total"] == 7  # total은 자르기 전 개수
+
+
+def test_explore_route_search_params(monkeypatch):
+    explore_mod._cache.clear()
+    api = TestClient(main.app)
+    rows = [db_row(1, title="진주 유등축제", tag="경남 진주시"), db_row(2, title="통영 케이블카", tag="경남 통영시", category="TRAVEL_SPOT", start=None, end=None)]
+    monkeypatch.setattr(main, "get_store", lambda: FakeStore(lambda lat, lng: rows))
+    r = api.get("/api/explore", params={"q": "케이블카"}).json()
+    assert [s["title"] for s in r["spots"]] == ["통영 케이블카"] and r["total"] == 1
+    assert {x["name"] for x in r["regions"]} == {"통영시"}
+    r2 = api.get("/api/explore", params={"region": "진주시"}).json()
+    assert [s["title"] for s in r2["spots"]] == ["진주 유등축제"]
+    assert api.get("/api/explore", params={"q": "가" * 61}).status_code == 422  # 너무 긴 검색어는 거절
+    assert api.get("/api/explore", params={"region": "x" * 21}).status_code == 422
 
 
 def test_explore_marks_upcoming_events_as_open_soon():

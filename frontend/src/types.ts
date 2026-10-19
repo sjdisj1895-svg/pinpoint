@@ -86,6 +86,12 @@ export interface RerouteResponse {
   route: GeoJSON.Feature | null;
 }
 
+/** 시·군 필터 칩: 이름과 (현재 검색어 기준) 개수 */
+export interface RegionFacet {
+  name: string;
+  count: number;
+}
+
 /** 카드 리스트용: 스팟 + T3 추천 정보 */
 export interface CardItem {
   spot: Spot;

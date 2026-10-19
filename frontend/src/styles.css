@@ -48,6 +48,24 @@ button:focus-visible, input:focus-visible, a:focus-visible { outline: 2px solid 
 .msg.error { background: #fee2e2; color: #991b1b; }
 .hint { color: var(--muted); font-size: 13px; margin: 0; }
 .link { background: none; border: 0; color: var(--brand); text-decoration: underline; padding: 6px 0; text-align: left; }
+.link.small { font-size: 12px; padding: 0; white-space: nowrap; }
+
+/* ---- 검색창 (내부 키워드 검색 + AI 추천 버튼) ---- */
+.searchbox form { display: flex; gap: 8px; }
+.field { flex: 1; min-width: 0; display: flex; align-items: center; gap: 8px; background: #fff; border: 1px solid var(--line); border-radius: 12px; padding: 0 12px; }
+.field:focus-within { border-color: var(--brand); box-shadow: 0 0 0 3px rgba(29, 78, 216, .12); }
+.field input { flex: 1; min-width: 0; border: 0; outline: 0; padding: 12px 0; font: inherit; background: transparent; }
+.field .clear { border: 0; background: none; color: var(--muted); padding: 4px; }
+.ai { padding: 0 14px; border: 0; border-radius: 12px; background: linear-gradient(135deg, #1d4ed8, #7c3aed); color: #fff; font-weight: 700; white-space: nowrap; }
+.ai:disabled { opacity: .45; cursor: default; }
+.searchbox .hint { margin: 8px 2px 0; }
+.searchbox .messages { display: flex; flex-direction: column; gap: 6px; max-height: 130px; overflow-y: auto; margin-top: 8px; }
+.region-select { flex: 1; max-width: 220px; padding: 7px 10px; border: 1px solid var(--line); border-radius: 10px; background: #fff; font: inherit; font-size: 13px; }
+.empty { background: #fff; border: 1px dashed var(--line); border-radius: 14px; padding: 16px; text-align: center; font-size: 14px; }
+.empty p { margin: 0 0 10px; color: #334155; line-height: 1.5; }
+.empty-actions { display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; }
+.empty-actions button { padding: 9px 14px; border-radius: 10px; border: 1px solid var(--line); background: #fff; }
+.empty-actions .ai { border: 0; background: linear-gradient(135deg, #1d4ed8, #7c3aed); color: #fff; }
 
 /* ---- 필터 · 정렬 (스크롤해도 위에 고정) ---- */
 .filters { position: sticky; top: 0; z-index: 5; background: var(--bg); padding: 10px 0 8px; display: flex; flex-direction: column; gap: 10px; border-bottom: 1px solid var(--line); }

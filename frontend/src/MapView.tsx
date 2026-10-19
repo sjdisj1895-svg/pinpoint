@@ -14,7 +14,7 @@ const KOREA_CENTER: L.LatLngTuple = [36.4, 127.9];
 
 /** Leaflet 지도(OpenFreeMap 벡터 / 대체 OSM 타일). 카카오맵 키가 없거나 실패했을 때 쓰인다. */
 export default function MapView({
-  data, items, course, transport, focusId, selectedId, onSelect, padBottom = 0, compact = false,
+  data, items, course, transport, focusId, selectedId, onSelect, padBottom = 0, compact = false, fitKey = "|",
 }: MapProps) {
   const elRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<L.Map | null>(null);
@@ -39,15 +39,21 @@ export default function MapView({
     };
   }, []);
 
-  // 새 결과 도착 시 T1 탐색 반경에 맞춰 이동
+  // 새 결과 도착 시 이동: 키워드·시·군 필터가 걸려 있으면 결과(핀들)에, 아니면 T1 탐색 반경에 맞춘다
   useEffect(() => {
     const map = mapRef.current;
     if (!map || !data) return;
+    const pts: L.LatLngTuple[] = items.map((i) => [i.spot.location.lat, i.spot.location.lng]);
+    if (fitKey !== "|" && pts.length) {
+      if (pts.length === 1) map.setView(pts[0], 13);
+      else map.fitBounds(L.latLngBounds(pts), { paddingTopLeft: [40, 40], paddingBottomRight: [40, 40 + padBottom], maxZoom: 13 });
+      return;
+    }
     const { center_coords: c, radius_km } = data.t1.target_region;
     // 지도에 올리지 않은 L.circle은 getBounds()가 실패하므로 LatLng.toBounds(한 변의 길이 m)를 쓴다
     map.fitBounds(L.latLng(c.lat, c.lng).toBounds(radius_km * 2000), { paddingBottomRight: [0, padBottom] });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [data]);
+  }, [data, fitKey]);
 
   // 마커 렌더링 (줌 레벨 적응)
   useEffect(() => {

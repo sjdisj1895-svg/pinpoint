@@ -1,7 +1,7 @@
 import { useState } from "react";
 import type { CSSProperties, Dispatch } from "react";
 import type { Action, State } from "./store";
-import type { CardItem, Category, Course, Spot, Weather } from "./types";
+import type { CardItem, Category, Course, RegionFacet, Spot, Weather } from "./types";
 import type { PeriodFilter, SortKey } from "./geo";
 import {
   ALL_CATEGORIES, CATEGORY_META, formatPeriod, isMapSearchLink, regionLabel, safeUrl, statusLabel,
@@ -44,36 +44,49 @@ function Brand({ state, onExplore }: { state: State; onExplore: () => void }) {
   );
 }
 
-function Chat({ state, onAsk, onSample }: { state: State; onAsk: (t: string) => void; onSample: () => void }) {
-  const [text, setText] = useState("");
+/** 검색창: 입력하면 AI 없이 바로 찾고(내부 검색), 부족하면 ✨ AI 추천 버튼으로 같은 문장을 AI에게 묻는다 */
+export const MAX_KEYWORD_LENGTH = 60; // 이보다 긴 입력은 키워드 검색이 아니라 AI에게 묻는 문장으로 본다 (서버 q 한도와 같다)
+
+function SearchBox({ state, dispatch, onAsk, onSample }: {
+  state: State; dispatch: Dispatch<Action>; onAsk: (t: string) => void; onSample: () => void;
+}) {
+  const text = state.queryInput;
+  const ask = () => {
+    const t = text.trim();
+    if (t && !state.loading) onAsk(t);
+  };
   return (
-    <section className="chat">
+    <section className="searchbox">
+      <form role="search" onSubmit={(e) => e.preventDefault()}>
+        <div className="field">
+          <span aria-hidden>🔍</span>
+          <input
+            value={text}
+            onChange={(e) => dispatch({ type: "setQueryInput", text: e.target.value })}
+            placeholder="검색어를 입력하세요 (예: 진주 야경, 벚꽃, 영화관)"
+            maxLength={2000}
+            aria-label="축제·장소·지역 검색"
+          />
+          {text && (
+            <button type="button" className="clear" aria-label="검색어 지우기" onClick={() => dispatch({ type: "setQueryInput", text: "" })}>✕</button>
+          )}
+        </div>
+        <button type="button" className="ai" onClick={ask} disabled={state.loading || !text.trim()}>
+          {state.loading ? "찾는 중…" : "✨ AI 추천"}
+        </button>
+      </form>
+      <p className="hint">
+        {text.trim().length > MAX_KEYWORD_LENGTH
+          ? "문장이 길어요. ✨ AI 추천으로 물어보세요."
+          : "키워드로 먼저 찾아보고, 문장으로 묻고 싶다면 ✨ AI 추천을 눌러 주세요."}
+      </p>
       <div className="messages" aria-live="polite">
         {state.messages.slice(-3).map((m, i) => (
           <p key={i} className={`msg ${m.role}`}>{m.text}</p>
         ))}
-        {state.loading && <p className="msg assistant">찾는 중이에요…</p>}
+        {state.loading && <p className="msg assistant">AI가 찾는 중이에요…</p>}
         {state.error && <p className="msg error">{state.error}</p>}
       </div>
-      <form
-        onSubmit={(e) => {
-          e.preventDefault();
-          const t = text.trim();
-          if (t && !state.loading) {
-            onAsk(t);
-            setText("");
-          }
-        }}
-      >
-        <input
-          value={text}
-          onChange={(e) => setText(e.target.value)}
-          placeholder="예: 이번 주말 진주에서 연인이랑 야경 보기 좋은 곳"
-          maxLength={2000}
-          aria-label="어디서 어떻게 놀고 싶은지 입력"
-        />
-        <button disabled={state.loading}>{state.loading ? "찾는 중…" : "추천"}</button>
-      </form>
       {!state.data && state.mode === "search" && (
         <button className="link" onClick={onSample}>샘플 데이터로 화면 확인</button>
       )}
@@ -92,12 +105,33 @@ const SORTS: { key: SortKey; label: string }[] = [
   { key: "DISTANCE", label: "거리순" },
 ];
 
-function FilterBar({ state, dispatch, total, showChips }: {
-  state: State; dispatch: Dispatch<Action>; total: number; showChips: boolean;
+function FilterBar({ state, dispatch, total, showChips, regionOptions }: {
+  state: State; dispatch: Dispatch<Action>; total: number; showChips: boolean; regionOptions: RegionFacet[];
 }) {
   const sorts = state.mode === "explore" ? SORTS.filter((s) => s.key !== "DISTANCE") : SORTS; // 둘러보기엔 기준점이 없다
+  const filtered = !!(state.region || state.queryInput.trim());
   return (
     <section className="filters" aria-label="필터와 정렬">
+      <div className="filter-row">
+        <span className="filter-label">지역</span>
+        <select
+          className="region-select"
+          value={state.region}
+          onChange={(e) => dispatch({ type: "setRegion", region: e.target.value })}
+          aria-label="시·군 선택"
+        >
+          <option value="">전체 시·군</option>
+          {regionOptions.map((r) => (
+            <option key={r.name} value={r.name}>{r.name} ({r.count})</option>
+          ))}
+          {state.region && !regionOptions.some((r) => r.name === state.region) && (
+            <option value={state.region}>{state.region} (0)</option>
+          )}
+        </select>
+        {filtered && (
+          <button className="link small" onClick={() => dispatch({ type: "resetFilters" })}>필터 초기화</button>
+        )}
+      </div>
       <div className="filter-row">
         <span className="filter-label">시기</span>
         <div className="seg" role="group" aria-label="시기">
@@ -263,19 +297,36 @@ interface PanelProps {
   onExplore: () => void;
   showChips: boolean; // 모바일은 지도 위 플로팅 칩을 쓴다
   mapEngine: "kakao" | "leaflet"; // 쓰고 있는 지도에 맞는 출처를 표기한다
+  regionOptions: RegionFacet[]; // 시·군 선택지 (개수 포함)
 }
 
 export default function Panel({
-  state, dispatch, items, shown, courses, onAsk, onSample, onReroute, onExplore, showChips, mapEngine,
+  state, dispatch, items, shown, courses, onAsk, onSample, onReroute, onExplore, showChips, mapEngine, regionOptions,
 }: PanelProps) {
+  const keyword = state.queryInput.trim();
   return (
     <div className="panel">
       <Brand state={state} onExplore={onExplore} />
-      <Chat state={state} onAsk={onAsk} onSample={onSample} />
-      {state.data && <FilterBar state={state} dispatch={dispatch} total={items.length} showChips={showChips} />}
+      <SearchBox state={state} dispatch={dispatch} onAsk={onAsk} onSample={onSample} />
+      {state.data && (
+        <FilterBar state={state} dispatch={dispatch} total={items.length} showChips={showChips} regionOptions={regionOptions} />
+      )}
       {state.mode === "search" && <CourseBar courses={courses} state={state} dispatch={dispatch} />}
       {state.mode === "search" && state.data && <RerouteBar disabled={state.loading} onReroute={onReroute} />}
-      {state.data && items.length === 0 && <p className="hint">조건에 맞는 곳이 없어요. 시기나 분류 필터를 바꿔 보세요.</p>}
+      {state.data && items.length === 0 && (
+        <div className="empty">
+          <p>
+            {keyword && keyword.length <= MAX_KEYWORD_LENGTH ? `'${keyword}'에 맞는 곳이 없어요.` : "조건에 맞는 곳이 없어요."}{" "}
+            필터를 바꾸거나 AI에게 물어보세요.
+          </p>
+          <div className="empty-actions">
+            <button onClick={() => dispatch({ type: "resetFilters" })}>필터 초기화</button>
+            {keyword && (
+              <button className="ai" disabled={state.loading} onClick={() => onAsk(keyword)}>✨ AI에게 물어보기</button>
+            )}
+          </div>
+        </div>
+      )}
       {!state.data && !state.loading && (
         <p className="hint">경남의 진행 중인 축제와 볼거리를 불러오는 중이에요. 바로 원하는 곳을 물어봐도 좋아요.</p>
       )}

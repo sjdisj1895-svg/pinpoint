@@ -167,9 +167,11 @@ def explore_endpoint(
     province: str = Query("경남", max_length=10),
     on: date | None = None,
     categories: str | None = Query(None, description="쉼표 구분, 예: FESTIVAL,TRAVEL_SPOT"),
+    q: str = Query("", max_length=60, description="키워드 검색(공백으로 나눈 모든 단어가 맞아야 함). 이름·요약·주소·지역·분류에서 찾는다"),
+    region: str = Query("", max_length=20, description="시·군 필터, 예: 진주시"),
     limit: int = Query(300, ge=1, le=500),
 ):
-    """권역 둘러보기: DB에 저장된 진행 중 스팟을 AI 없이 바로 반환 (외부 API 호출 없음)."""
+    """권역 둘러보기·내부 검색: DB에 저장된 진행 중 스팟을 AI 없이 바로 반환 (외부 API 호출 없음)."""
     store = get_store()
     if not store:
         raise HTTPException(503, "SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY가 설정되지 않았습니다.")
@@ -178,7 +180,7 @@ def explore_endpoint(
     except ValueError:
         raise HTTPException(422, "알 수 없는 카테고리입니다.")
     try:
-        result = explore_mod.explore(store, province, on or date.today(), cats, limit)
+        result = explore_mod.explore(store, province, on or date.today(), cats, limit, q, region.strip())
     except KeyError:
         raise HTTPException(404, f"지원하지 않는 권역입니다: {province}")
     except Exception as e:  # noqa: BLE001

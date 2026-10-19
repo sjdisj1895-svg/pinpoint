@@ -19,7 +19,8 @@ const TILES_TIMEOUT_MS = 8000;
 
 /** 카카오맵 화면. Leaflet 화면(MapView)과 같은 props·같은 핀 모양·같은 줌 단계 기준을 쓴다. */
 export default function KakaoMapView({
-  data, items, course, transport, focusId, selectedId, onSelect, padBottom = 0, compact = false, appKey, onUnavailable,
+  data, items, course, transport, focusId, selectedId, onSelect, padBottom = 0, compact = false, fitKey = "|",
+  appKey, onUnavailable,
 }: Props) {
   const elRef = useRef<HTMLDivElement>(null);
   const kakaoRef = useRef<any>(null);
@@ -114,13 +115,30 @@ export default function KakaoMapView({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [appKey]);
 
-  // 새 결과 도착 시 T1 탐색 반경에 맞춰 이동
+  // 새 결과 도착 시 이동: 키워드·시·군 필터가 걸려 있으면 결과(핀들)에, 아니면 T1 탐색 반경에 맞춘다
   useEffect(() => {
     if (!ready || !data) return;
+    if (fitKey !== "|" && items.length) {
+      const box = items.reduce<Box>(
+        (b, i) => ({
+          south: Math.min(b.south, i.spot.location.lat), north: Math.max(b.north, i.spot.location.lat),
+          west: Math.min(b.west, i.spot.location.lng), east: Math.max(b.east, i.spot.location.lng),
+        }),
+        { south: 90, north: -90, west: 180, east: -180 },
+      );
+      const lat = (box.south + box.north) / 2;
+      const lng = (box.west + box.east) / 2;
+      if (items.length === 1) goToZoom(lat, lng, 13);
+      else {
+        mapRef.current.setBounds(toBounds(box), 40, 40, 40 + padBottom, 40);
+        if (currentZoom() > 13) goToZoom(lat, lng, 13); // 너무 확대되지 않게
+      }
+      return;
+    }
     const { center_coords: c, radius_km } = data.t1.target_region;
     mapRef.current.setBounds(toBounds(boxForRadius(c.lat, c.lng, radius_km)), 0, 0, padBottom, 0);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [ready, data]);
+  }, [ready, data, fitKey]);
 
   // 마커 렌더링 (줌 단계 적응)
   useEffect(() => {

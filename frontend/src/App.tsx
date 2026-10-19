@@ -1,12 +1,12 @@
-import { useCallback, useEffect, useMemo, useReducer, useState } from "react";
+import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from "react";
 import { fetchExplore, fetchPipeline, fetchReroute } from "./api";
 import type { Weather } from "./types";
 import BottomSheet from "./BottomSheet";
-import { buildCards, filterByPeriod, sortItems } from "./geo";
+import { buildCards, filterByPeriod, filterByQuery, filterByRegion, regionFacets, sortItems } from "./geo";
 import KakaoMapView from "./KakaoMapView";
 import MapView from "./MapView";
 import { MOCK } from "./mock";
-import Panel, { CategoryChips } from "./Panel";
+import Panel, { CategoryChips, MAX_KEYWORD_LENGTH } from "./Panel";
 import { initialState, reducer } from "./store";
 
 const HOME_PROVINCE = "경남"; // 첫 화면으로 보여 줄 권역
@@ -36,6 +36,16 @@ function useIsMobile(): boolean {
   return m;
 }
 
+/** 값이 바뀐 뒤 ms만큼 가만히 있으면 반영한다 (검색어를 칠 때마다 요청하지 않게) */
+function useDebounced<T>(value: T, ms: number): T {
+  const [v, setV] = useState(value);
+  useEffect(() => {
+    const t = setTimeout(() => setV(value), ms);
+    return () => clearTimeout(t);
+  }, [value, ms]);
+  return v;
+}
+
 /** 서버가 알려 주는 공개 설정(카카오맵 JavaScript 키). 실패하거나 키가 없으면 null → OpenFreeMap 지도 */
 function useMapConfig(): { loading: boolean; kakaoKey: string | null } {
   const [cfg, setCfg] = useState<{ loading: boolean; kakaoKey: string | null }>({ loading: true, kakaoKey: null });
@@ -61,29 +71,60 @@ export default function App() {
   const forceLeaflet = new URLSearchParams(window.location.search).get("map") === "leaflet";
   const mapEngine: "kakao" | "leaflet" = !forceLeaflet && mapCfg.kakaoKey && !kakaoFailed ? "kakao" : "leaflet";
 
-  // 카테고리 → 시기 필터 → 정렬 순으로 적용한 전체 결과 (지도에는 이 전체가, 목록에는 "더보기" 단위로 보인다)
+  // 키워드는 입력을 멈춘 뒤 반영한다. 입력을 비우면 기다리지 않고 바로 전체로 돌아간다.
+  const debouncedInput = useDebounced(state.queryInput, 300);
+  const typed = state.queryInput.trim() ? debouncedInput.trim() : "";
+  const q = typed.length <= MAX_KEYWORD_LENGTH ? typed : ""; // 긴 문장은 키워드가 아니라 AI에게 묻는 입력으로 본다
+
+  // 둘러보기: 키워드·시·군은 서버(DB 전체)가 걸러서 준다. AI 추천 결과: 몇 건 안 되므로 화면에서 바로 거른다.
+  const clientSide = state.mode === "search";
+  const base = useMemo(() => (state.data ? buildCards(state.data) : []), [state.data]);
+  const queried = useMemo(() => (clientSide ? filterByQuery(base, q) : base), [clientSide, base, q]);
+  const regionOptions = useMemo(() => (clientSide ? regionFacets(queried) : state.regions), [clientSide, queried, state.regions]);
+
+  // (키워드·시·군) → 분류 → 시기 → 정렬 순으로 적용한 전체 결과 (지도에는 이 전체가, 목록에는 "더보기" 단위로 보인다)
   const items = useMemo(() => {
     if (!state.data) return [];
-    const byCategory = buildCards(state.data).filter((c) => state.activeCategories.includes(c.spot.category));
+    const byRegion = clientSide ? filterByRegion(queried, state.region) : queried;
+    const byCategory = byRegion.filter((c) => state.activeCategories.includes(c.spot.category));
     return sortItems(filterByPeriod(byCategory, state.period), state.sort, state.data.t1.target_region.center_coords);
-  }, [state.data, state.activeCategories, state.period, state.sort]);
+  }, [state.data, clientSide, queried, state.region, state.activeCategories, state.period, state.sort]);
+  const fitKey = `${q}|${state.region}`; // 검색어·시·군이 바뀌면 지도를 그 결과에 맞춘다 ("|" = 필터 없음)
   const shown = useMemo(() => items.slice(0, state.visible), [items, state.visible]);
   const course = useMemo(
     () => (state.showCourse ? state.data?.t3.courses.find((c) => c.course_id === state.courseId) ?? null : null),
     [state.showCourse, state.data, state.courseId],
   );
 
+  const lastFetch = useRef("|"); // 마지막으로 불러온 (키워드|시·군). 같은 조건을 다시 요청하지 않는다
+  const reqId = useRef(0); // 늦게 도착한 옛 응답이 새 결과를 덮어쓰지 않게 한다
+
   const onExplore = useCallback(async () => {
+    lastFetch.current = "|";
+    const id = ++reqId.current;
     try {
-      const data = await fetchExplore(HOME_PROVINCE, HOME_LABEL);
-      const greeting = data.t2.length
-        ? `${HOME_PROVINCE}에서 지금 즐길 수 있는 축제와 볼거리를 모았어요. 원하는 분위기나 일정을 말해 주시면 골라 드릴게요.`
+      const r = await fetchExplore(HOME_PROVINCE, HOME_LABEL);
+      if (id !== reqId.current) return;
+      const greeting = r.data.t2.length
+        ? `${HOME_PROVINCE}에서 지금 즐길 수 있는 축제와 볼거리를 모았어요. 검색창에 키워드를 입력하거나 시·군을 골라 보세요. 문장으로 묻고 싶다면 ✨ AI 추천을 눌러 주세요.`
         : "아직 수집된 데이터가 없어요. 그래도 원하는 곳을 물어보면 실시간으로 찾아 드려요.";
-      dispatch({ type: "explored", data, greeting });
+      dispatch({ type: "explored", data: r.data, greeting, regions: r.regions, total: r.total });
     } catch (e) {
       dispatch({ type: "failure", error: e instanceof Error ? e.message : "알 수 없는 오류" });
     }
   }, []);
+
+  // 둘러보기에서 키워드·시·군이 바뀌면 서버(DB 전체)에서 다시 찾는다. AI 호출 없음.
+  useEffect(() => {
+    if (state.mode !== "explore") return;
+    const key = `${q}|${state.region}`;
+    if (key === lastFetch.current) return;
+    lastFetch.current = key;
+    const id = ++reqId.current;
+    fetchExplore(HOME_PROVINCE, HOME_LABEL, { q, region: state.region })
+      .then((r) => id === reqId.current && dispatch({ type: "exploreResults", data: r.data, regions: r.regions, total: r.total }))
+      .catch((e) => id === reqId.current && dispatch({ type: "failure", error: e instanceof Error ? e.message : "알 수 없는 오류" }));
+  }, [q, state.region, state.mode]);
 
   const onAsk = useCallback(async (text: string) => {
     dispatch({ type: "submit", text });
@@ -143,6 +184,7 @@ export default function App() {
       onExplore={onExplore}
       showChips={!mobile}
       mapEngine={mapEngine}
+      regionOptions={regionOptions}
     />
   );
 
@@ -156,6 +198,7 @@ export default function App() {
     onSelect,
     padBottom: mobile ? Math.round(window.innerHeight * 0.5) : 0,
     compact: mobile,
+    fitKey,
   };
   const map = mapCfg.loading ? (
     <div className="map" aria-busy="true" aria-label="지도를 불러오는 중" />
