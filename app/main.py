@@ -16,6 +16,7 @@ from pydantic import BaseModel, Field
 load_dotenv()
 
 from app import explore as explore_mod  # noqa: E402
+from app import health as health_mod  # noqa: E402
 from app import pipeline as pipeline_mod  # noqa: E402  (.env 로드 후 import)
 from app.config import Settings, load_settings  # noqa: E402
 from app.db import SpotStore  # noqa: E402
@@ -97,6 +98,26 @@ def pipeline(req: ParseRequest):
 @api.post("/reroute", response_model=RerouteResponse, dependencies=[Depends(limit_llm)])
 def reroute_endpoint(req: RerouteRequest):
     return _call(reroute, req)
+
+
+@api.get("/health")
+def health(response: Response):
+    """배포 설정 진단. 키 값은 싣지 않고 형태(종류·길이·공백 여부 등)와 DB 접속 결과만 알려 준다."""
+    s = get_settings()
+    report: dict = {"supabase": health_mod.supabase_report(s), "llm": health_mod.llm_report(),
+                    "keys_present": health_mod.keys_present(s), "on_vercel": bool(os.environ.get("VERCEL"))}
+    store = get_store()
+    if not store:
+        report["db_check"] = "Supabase 설정 없음"
+    else:
+        try:
+            store.search(35.2, 128.6, 1, date.today(), None, 1)
+            report["db_check"] = "ok"
+        except Exception as e:  # noqa: BLE001
+            logging.getLogger("pinplay").exception("health DB 점검 실패")
+            report["db_check"] = f"실패: {type(e).__name__} {getattr(e, 'code', '') or ''}".strip()
+    response.headers["Cache-Control"] = "no-store"
+    return report
 
 
 def _db_failure(e: Exception) -> HTTPException:
