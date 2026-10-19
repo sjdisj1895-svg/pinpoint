@@ -1,0 +1,13 @@
+# Vercel CLI(vercel 명령)로 올릴 때 제외할 것. 비밀키와 로컬 산출물이 올라가지 않게 한다.
+.env
+.env.*
+!.env.example
+.venv
+.pytest_cache
+__pycache__
+.vscode
+node_modules
+frontend/node_modules
+frontend/dist
+data
+tests

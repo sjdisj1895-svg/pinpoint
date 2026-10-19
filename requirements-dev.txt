@@ -1,0 +1,4 @@
+# 로컬 개발·테스트용 (배포 번들에는 들어가지 않는다)
+-r requirements.txt
+uvicorn[standard]>=0.30
+pytest>=8
