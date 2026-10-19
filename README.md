@@ -95,7 +95,7 @@ CLI로 올리려면: `npm i -g vercel` → `vercel login` → 프로젝트 폴�
 - **TourAPI 링크:** 항목의 `source_url`은 공식 상세 페이지가 아닌 지도 검색 링크입니다.
 - **전국문화축제표준데이터는 파일 데이터입니다.** API가 아니라서 data.go.kr에서 CSV를 내려받아 `data/festival_standard.csv`(또는 `MOIS_FESTIVAL_FILE`)에 두어야 합니다. 없으면 이 소스만 건너뛰고 TourAPI 축제로 동작합니다. 컬럼명은 한글/영문 별칭을 모두 허용하며, 실제 내려받은 파일로 동작을 확인했습니다.
 - **응답 속도:** `/pipeline` 한 번에 30~45초 정도입니다 (T1 약 5초, T2 약 10초, T3 약 15초). T2는 판단만 출력하게 줄였고, 후보는 카테고리별 8개·총 24개로 제한합니다. OpenAI 호환 호출은 추론 강도를 낮추는 `output_config.effort=low`를 보내고(`API_EFFORT`, 서비스가 거부하면 자동 제외), 게이트웨이 504를 피하려고 스트리밍을 씁니다 (`API_STREAM`). 추론 강도를 낮추면 후보를 더 엄격하게 거를 수 있습니다.
-- **지도:** Leaflet + OpenStreetMap 타일입니다. 카카오/네이버 지도로 바꾸려면 `frontend/src/MapView.tsx`만 교체하면 됩니다.
+- **지도:** Leaflet 위에 OpenFreeMap 벡터 지도(MapLibre)를 얹었습니다. 키·가입이 필요 없고 지명은 한글 우선으로 표시합니다. 스타일은 `frontend/src/mapStyle.ts`의 `DEFAULT_TILE`(positron/liberty/bright)에서 고르고, 주소에 `?tiles=liberty`를 붙여 미리 비교할 수 있습니다. WebGL을 못 쓰는 기기에서는 OSM 타일로 자동 대체됩니다. OpenFreeMap·OpenStreetMap 출처 표기는 지도와 패널 아래에 두었으니 지우지 마세요. 카카오/네이버 지도로 바꾸려면 `MapView.tsx`와 `basemap.ts`를 교체하면 됩니다. (CARTO 기본 지도는 이제 API 키가 필요해 쓰지 않습니다.)
 - **현재 위치 기반 재검색 없음:** T5 후보는 최초 T2 결과 안에서만 고릅니다.
 
 ## 테스트

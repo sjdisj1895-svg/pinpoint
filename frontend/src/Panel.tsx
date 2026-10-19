@@ -284,6 +284,14 @@ export default function Panel({ state, dispatch, items, shown, courses, onAsk, o
           더보기 ({shown.length}/{items.length})
         </button>
       )}
+      {/* 모바일은 지도 위 표기가 시트에 가려져, 이용 조건에 맞게 시트 안에도 출처를 둔다 */}
+      <footer className="credits">
+        지도 ©{" "}
+        <a href="https://openfreemap.org" target="_blank" rel="noopener noreferrer">OpenFreeMap</a> ©{" "}
+        <a href="https://www.openmaptiles.org/" target="_blank" rel="noopener noreferrer">OpenMapTiles</a> · 데이터 ©{" "}
+        <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener noreferrer">OpenStreetMap</a> 기여자
+        · 사진 한국관광공사
+      </footer>
     </div>
   );
 }

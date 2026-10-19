@@ -1,6 +1,9 @@
 import { useEffect, useRef, useState } from "react";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
+import "maplibre-gl/dist/maplibre-gl.css";
+import { loadBasemap } from "./basemap";
+import { pickTileStyle } from "./mapStyle";
 import type { CardItem, Course, PipelineResponse, Spot, Transport } from "./types";
 import {
   CATEGORY_META, CITY_VIEW_MAX_ZOOM, PROVINCE_VIEW_MAX_ZOOM, earliestShowtime, escapeHtml, groupSpots, travelLabel,
@@ -50,16 +53,13 @@ export default function MapView({
 
   // 지도 초기화
   useEffect(() => {
-    const map = L.map(elRef.current!, { center: KOREA_CENTER, zoom: 7, zoomControl: false });
-    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
-      maxZoom: 19,
-      attribution: "&copy; OpenStreetMap contributors",
-    }).addTo(map);
+    const map = L.map(elRef.current!, { center: KOREA_CENTER, zoom: 7, zoomControl: false, maxZoom: 18 });
     L.control.zoom({ position: "bottomright" }).addTo(map);
     markerLayer.current.addTo(map);
     courseLayer.current.addTo(map);
     map.on("zoomend", () => setZoom(map.getZoom()));
     mapRef.current = map;
+    void loadBasemap(map, pickTileStyle(window.location.search), () => mapRef.current === map);
     return () => {
       map.remove();
       mapRef.current = null;

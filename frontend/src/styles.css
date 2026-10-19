@@ -18,9 +18,13 @@ button:focus-visible, input:focus-visible, a:focus-visible { outline: 2px solid 
 .app.desktop { display: grid; grid-template-columns: 40% 60%; }
 .left { overflow-y: auto; border-right: 1px solid var(--line); background: var(--bg); }
 .right, .map { height: 100%; width: 100%; }
+.leaflet-container { background: #e9eef5; font-family: inherit; } /* 타일이 늦게 뜰 때 보이는 바탕색 */
 .app.mobile { position: relative; overflow: hidden; }
 .app.mobile .map { position: absolute; inset: 0; }
 .app.mobile .leaflet-control-zoom { display: none; } /* 모바일은 핀치 줌 */
+.app.mobile .leaflet-control-attribution { display: none; } /* 시트에 가려지므로 패널 맨 아래 크레딧으로 대신한다 */
+.credits { margin-top: 6px; font-size: 11px; line-height: 1.5; color: var(--muted); text-align: center; }
+.credits a { color: inherit; }
 
 /* ---- 패널 ---- */
 .panel { padding: 0 16px 28px; display: flex; flex-direction: column; gap: 14px; }
