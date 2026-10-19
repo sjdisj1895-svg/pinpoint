@@ -1,3 +1,4 @@
+import logging
 import os
 import secrets
 import threading
@@ -98,6 +99,15 @@ def reroute_endpoint(req: RerouteRequest):
     return _call(reroute, req)
 
 
+def _db_failure(e: Exception) -> HTTPException:
+    """DB 오류를 원인이 보이는 502로 바꾼다. 로그에는 전체를 남기고, 응답에는 오류 종류와 코드만 담는다(키·주소 제외)."""
+    logging.getLogger("pinplay").exception("DB 조회 실패")
+    code = getattr(e, "code", None)
+    msg = str(getattr(e, "message", "") or "")[:80]  # PostgREST 오류 메시지 (예: Invalid API key)
+    detail = f"데이터베이스 조회에 실패했어요 ({type(e).__name__}{f': {code}' if code else ''})"
+    return HTTPException(502, f"{detail} {msg}".strip())
+
+
 @api.get("/spots/search")
 def spots_search(
     lat: float = Query(ge=33, le=39),
@@ -115,7 +125,10 @@ def spots_search(
         cats = {Category(c.strip()).value for c in categories.split(",")} if categories else None
     except ValueError:
         raise HTTPException(422, "알 수 없는 카테고리입니다.")
-    rows = store.search(lat, lng, radius_km, on or date.today(), cats, limit)
+    try:
+        rows = store.search(lat, lng, radius_km, on or date.today(), cats, limit)
+    except Exception as e:  # noqa: BLE001
+        raise _db_failure(e)
     return {"count": len(rows), "spots": rows}
 
 
@@ -139,6 +152,8 @@ def explore_endpoint(
         result = explore_mod.explore(store, province, on or date.today(), cats, limit)
     except KeyError:
         raise HTTPException(404, f"지원하지 않는 권역입니다: {province}")
+    except Exception as e:  # noqa: BLE001
+        raise _db_failure(e)
     # CDN(Vercel Edge)이 15분간 응답을 보관해 함수 호출·DB 조회 없이 바로 돌려준다. 만료 뒤에도 1시간은 오래된 응답을 먼저 주고 뒤에서 갱신한다.
     response.headers["Cache-Control"] = "public, s-maxage=900, stale-while-revalidate=3600"
     return result

@@ -123,6 +123,30 @@ def test_explore_route(monkeypatch):
     assert api.get("/explore", params={"categories": "BAD"}).status_code == 422
 
 
+class DbError(Exception):
+    """postgrest APIError처럼 code/message를 가진 예외."""
+
+    code, message = "401", "Invalid API key"
+
+
+def test_db_failures_become_502_with_the_error_kind_not_secrets(monkeypatch):
+    explore_mod._cache.clear()
+
+    class Broken:
+        def search(self, *a, **k):
+            raise DbError("SECRET-URL https://x.supabase.co key=abc")
+
+    monkeypatch.setattr(main, "get_store", lambda: Broken())
+    api = TestClient(main.app, raise_server_exceptions=False)
+    for path, params in [("/api/explore", {}), ("/api/spots/search", {"lat": 37, "lng": 127})]:
+        r = api.get(path, params=params)
+        assert r.status_code == 502
+        detail = r.json()["detail"]
+        assert "DbError" in detail and "401" in detail and "Invalid API key" in detail
+        assert "SECRET-URL" not in detail and "supabase.co" not in detail  # 예외 본문은 응답에 싣지 않는다
+        assert "cache-control" not in r.headers  # 오류는 CDN에 캐시하지 않는다
+
+
 def test_build_spot_carries_image_from_raw_extra():
     row = {"category": "FESTIVAL", "title": "축제", "address": "경남 진주시 1", "lat": 35.1, "lng": 128.1,
            "extra": {"image": "http://tong.visitkorea.or.kr/x.jpg"}}
