@@ -1,5 +1,7 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import type { CSSProperties, Dispatch } from "react";
+import LikeButton from "./LikeButton";
+import { useSocial } from "./SocialContext";
 import type { Action, State } from "./store";
 import type { CardItem, Category, Course, RegionFacet, Weather } from "./types";
 import type { PeriodFilter, SortKey } from "./geo";
@@ -29,6 +31,7 @@ export function CategoryChips({ active, dispatch }: { active: Category[]; dispat
 }
 
 function Brand({ state, onExplore }: { state: State; onExplore: () => void }) {
+  const { enabled, user, login, logout } = useSocial();
   return (
     <header className="brand">
       <span className="logo" aria-hidden>📍</span>
@@ -39,6 +42,15 @@ function Brand({ state, onExplore }: { state: State; onExplore: () => void }) {
       {state.mode === "search" && (
         <button className="ghost" onClick={onExplore} disabled={state.loading}>경남 둘러보기</button>
       )}
+      {enabled &&
+        (user ? (
+          <>
+            <span className="me" title="카카오 계정으로 로그인 중">{user.nickname}</span>
+            <button className="ghost" onClick={() => void logout()}>로그아웃</button>
+          </>
+        ) : (
+          <button className="kakao-login" onClick={login}>카카오 로그인</button>
+        ))}
     </header>
   );
 }
@@ -253,6 +265,7 @@ function Card({ item, state, dispatch }: { item: CardItem; state: State; dispatc
   const { spot } = item;
   const m = CATEGORY_META[spot.category];
   const selected = state.selectedId === spot.id;
+  const { enabled, summaries } = useSocial();
   return (
     <li
       className={`pcard${selected ? " selected" : ""}`}
@@ -274,6 +287,15 @@ function Card({ item, state, dispatch }: { item: CardItem; state: State; dispatc
           {item.why && <p className="why-snippet">💡 {item.why}</p>}
         </div>
       </button>
+      {/* 좋아요·댓글 수: 버튼 안에 버튼을 넣을 수 없어 카드 아래 줄로 둔다. DB 고유 ID(place_id)가 있는 장소만 */}
+      {enabled && spot.place_id && (
+        <div className="pcard-foot">
+          <LikeButton placeId={spot.place_id} />
+          <span className="cmt-count" aria-label={`댓글 ${summaries[spot.place_id]?.comments ?? 0}개`}>
+            💬 {summaries[spot.place_id]?.comments ?? 0}
+          </span>
+        </div>
+      )}
     </li>
   );
 }
@@ -299,10 +321,18 @@ export default function Panel({
   monthCounts,
 }: PanelProps) {
   const keyword = state.queryInput.trim();
+  const { enabled, load, notice, dismissNotice } = useSocial();
+  // 지금 목록에 보이는 카드들의 좋아요·댓글 수를 한 번에 불러온다 ("더보기"로 늘어나면 새로 보이는 것만 추가)
+  useEffect(() => {
+    if (enabled) load(shown.map((i) => i.spot.place_id).filter((id): id is string => !!id));
+  }, [enabled, shown, load]);
   return (
     <div className="panel">
       <Brand state={state} onExplore={onExplore} />
       <SearchBox state={state} dispatch={dispatch} onAsk={onAsk} onSample={onSample} />
+      {notice && (
+        <p className="msg error" role="alert" onClick={dismissNotice}>{notice} <small>(눌러서 닫기)</small></p>
+      )}
       {state.data && (
         <FilterBar state={state} dispatch={dispatch} total={items.length} showChips={showChips} regionOptions={regionOptions}
           monthCounts={monthCounts} />

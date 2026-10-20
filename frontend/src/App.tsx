@@ -9,6 +9,7 @@ import KakaoMapView from "./KakaoMapView";
 import MapView from "./MapView";
 import { MOCK } from "./mock";
 import PlaceDetail from "./PlaceDetail";
+import SocialPanel from "./SocialPanel";
 import Panel, { CategoryChips, MAX_KEYWORD_LENGTH } from "./Panel";
 import { initialState, reducer } from "./store";
 
@@ -208,7 +209,9 @@ export default function App() {
     />
   );
   const drawer = selectedItem && (
-    <PlaceDetail item={selectedItem} onClose={() => dispatch({ type: "select", id: null })} />
+    <PlaceDetail item={selectedItem} onClose={() => dispatch({ type: "select", id: null })}>
+      {selectedItem.spot.place_id && <SocialPanel placeId={selectedItem.spot.place_id} />}
+    </PlaceDetail>
   );
 
   const mapProps = {

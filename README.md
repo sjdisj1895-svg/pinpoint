@@ -95,6 +95,18 @@ CLI로 올리려면: `npm i -g vercel` → `vercel login` → 프로젝트 폴�
 - **서버 시작 시 미리 불러오기(warm)는 Vercel에서 꺼집니다.** 서버리스는 인스턴스가 수시로 바뀌기 때문입니다. 대신 위 CDN 캐시가 첫 방문 지연을 줄입니다.
 - **Python 3.13**(`.python-version`)과 `requirements.txt`의 실행용 패키지만 번들에 들어갑니다 (테스트·uvicorn은 `requirements-dev.txt`).
 
+## 좋아요·댓글 (카카오 로그인)
+
+로그인한 사람만 좋아요·댓글을 남길 수 있고, 읽기는 누구나 가능합니다. 아래 설정이 모두 갖춰지기 전에는 화면에서 자동으로 숨겨집니다.
+
+1. Supabase SQL Editor에서 `supabase/social.sql` 실행
+2. Kakao Developers → 카카오 로그인 활성화, Redirect URI 등록
+   - `http://localhost:8000/api/auth/kakao/callback`
+   - `https://<배포 주소>/api/auth/kakao/callback`
+   - 동의항목에서 닉네임 사용 설정 (Client Secret을 켰다면 `KAKAO_CLIENT_SECRET`에 입력)
+3. `SESSION_SECRET`(32자 이상 무작위 문자열)을 `.env`와 Vercel 환경변수에 추가. 배포 주소가 여러 개면 `SITE_URL`도 지정
+4. 신고가 3건 쌓인 댓글은 자동으로 숨겨집니다. 관리자는 `X-Admin-Token: <ADMIN_TOKEN>` 헤더로 `GET /api/admin/reports`, `DELETE /api/admin/comments/{id}` 호출
+
 ## 알려진 한계
 
 - **상영 회차 없음:** KOBIS에는 극장별 시간표가 없습니다. 영화관은 위치와 박스오피스 상영작까지만 제공되고 "회차 미확인"으로 표시됩니다. 회차는 극장별 소스가 필요합니다.

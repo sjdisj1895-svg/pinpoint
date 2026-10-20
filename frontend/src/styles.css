@@ -38,6 +38,33 @@ button:focus-visible, input:focus-visible, a:focus-visible { outline: 2px solid 
 .drawer-link { color: var(--brand); font-weight: 700; text-decoration: none; }
 .drawer-link:hover { text-decoration: underline; }
 
+/* ---- 로그인 · 좋아요 · 댓글 ---- */
+.me { font-size: 13px; font-weight: 700; max-width: 96px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.kakao-login { border: 0; border-radius: 999px; background: #fee500; color: #191919; font-weight: 700; font-size: 13px; padding: 7px 14px; }
+.kakao-login.wide { width: 100%; border-radius: 12px; padding: 12px; font-size: 14px; }
+.kakao-login:hover { filter: brightness(.96); }
+.like { display: inline-flex; align-items: center; gap: 4px; border: 1px solid var(--line); background: #fff; border-radius: 999px; padding: 5px 12px; font-size: 13px; color: var(--muted); }
+.like.on { color: #e11d48; border-color: #fecdd3; background: #fff1f2; font-weight: 700; }
+.like.large { padding: 8px 16px; font-size: 15px; }
+.like:hover { border-color: #fda4af; }
+.pcard-foot { display: flex; align-items: center; justify-content: space-between; padding: 0 12px 12px; }
+.cmt-count { font-size: 13px; color: var(--muted); }
+.social-panel { margin-top: 10px; padding-top: 16px; border-top: 1px solid var(--line); display: flex; flex-direction: column; gap: 12px; }
+.social-head { display: flex; align-items: center; justify-content: space-between; }
+.composer { display: flex; flex-direction: column; gap: 6px; }
+.composer textarea { width: 100%; resize: vertical; padding: 10px 12px; border: 1px solid var(--line); border-radius: 12px; font: inherit; font-size: 14px; background: #fff; }
+.composer textarea:focus { outline: 2px solid var(--brand); outline-offset: 1px; }
+.composer-foot { display: flex; align-items: center; justify-content: space-between; }
+.composer-foot small { color: var(--muted); }
+.composer-foot button { padding: 8px 18px; border: 0; border-radius: 10px; background: var(--brand); color: #fff; font-weight: 700; }
+.composer-foot button:disabled { opacity: .45; cursor: default; }
+.comments { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 10px; }
+.comment { background: #fff; border: 1px solid var(--line); border-radius: 12px; padding: 10px 12px; }
+.comment-meta { display: flex; align-items: center; gap: 8px; font-size: 13px; }
+.comment-meta small { color: var(--muted); flex: 1; }
+.link.muted { color: var(--muted); }
+.comment-body { margin: 6px 0 0; font-size: 14px; line-height: 1.55; white-space: pre-wrap; overflow-wrap: anywhere; }
+
 /* ---- 월 필터 (1~12월 체크박스) ---- */
 .months { border: 0; margin: 0; padding: 0; display: flex; align-items: flex-start; gap: 10px; min-width: 0; }
 .months legend { float: left; padding: 0; margin-top: 6px; }

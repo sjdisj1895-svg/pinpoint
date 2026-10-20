@@ -24,6 +24,8 @@ from app.harvest import Harvester  # noqa: E402
 from app.llm import LLMOutputError, LLMServiceError  # noqa: E402
 from app.providers import build_provider  # noqa: E402
 from app.ratelimit import limit_llm  # noqa: E402
+from app.social import SocialStore  # noqa: E402
+from app.social_routes import build_router as build_social_router  # noqa: E402
 from app.schemas import Category, ParseRequest, RerouteRequest, RerouteResponse, T1Result  # noqa: E402
 from app.stages.t1_intent import parse_intent  # noqa: E402
 from app.stages.t5_rerouter import reroute  # noqa: E402
@@ -67,6 +69,17 @@ def get_harvester() -> Harvester:
     return Harvester(get_settings(), httpx.Client())
 
 
+@lru_cache
+def get_http() -> httpx.Client:
+    return httpx.Client()  # 카카오 로그인 서버 통신용 (스레드 간에 공유해도 안전)
+
+
+def get_social() -> SocialStore | None:
+    """좋아요·댓글 저장소. 동시 요청이 같은 DB 연결을 공유하면 소켓 오류가 나므로 스레드별 연결을 쓴다."""
+    st = get_store()
+    return SocialStore(st.for_thread().client) if st else None
+
+
 # T2가 쓸 데이터 공급자 (키가 하나도 없으면 EmptyProvider)
 pipeline_mod.provider = build_provider(get_settings(), get_harvester(), get_store())
 
@@ -103,9 +116,11 @@ def reroute_endpoint(req: RerouteRequest):
 @api.get("/config")
 def public_config(response: Response):
     """화면이 필요로 하는 공개 설정. 카카오맵 JavaScript 키는 원래 브라우저에 공개되는 키이므로 이것만 내보낸다
-    (다른 키는 절대 포함하지 않는다). 키가 없으면 null이고 화면은 OpenFreeMap으로 동작한다."""
+    (다른 키는 절대 포함하지 않는다). 키가 없으면 null이고 화면은 OpenFreeMap으로 동작한다.
+    social: 좋아요·댓글(카카오 로그인)에 필요한 설정이 모두 있는지. false면 화면에서 이 기능을 숨긴다."""
     response.headers["Cache-Control"] = "public, max-age=300"
-    return {"kakao_js_key": get_settings().kakao_js_key or None}
+    s = get_settings()
+    return {"kakao_js_key": s.kakao_js_key or None, "social": s.social_enabled}
 
 
 @api.get("/health")
@@ -155,7 +170,8 @@ def spots_search(
     except ValueError:
         raise HTTPException(422, "알 수 없는 카테고리입니다.")
     try:
-        rows = store.search(lat, lng, radius_km, on or date.today(), cats, limit)
+        local = store.for_thread() if hasattr(store, "for_thread") else store  # 동시 요청마다 DB 연결을 따로 쓴다
+        rows = local.search(lat, lng, radius_km, on or date.today(), cats, limit)
     except Exception as e:  # noqa: BLE001
         raise _db_failure(e)
     return {"count": len(rows), "spots": rows}
@@ -215,6 +231,8 @@ def harvest(req: HarvestRequest, x_admin_token: str | None = Header(default=None
     return {"collected": len(result.spots), "upserted": upserted, "counts": result.counts,
             "errors": result.errors, "skipped": result.skipped, "dropped_no_coords": result.dropped_no_coords}
 
+
+api.include_router(build_social_router(get_settings, get_social, get_http))  # 로그인·좋아요·댓글·신고
 
 app.include_router(api)
 app.include_router(api, prefix="/api")

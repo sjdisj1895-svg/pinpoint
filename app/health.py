@@ -74,5 +74,7 @@ def keys_present(s: Settings) -> dict[str, bool]:
     return {
         "data_go_kr": bool(s.data_go_key), "kobis": bool(s.kobis_key), "kakao": bool(s.kakao_rest_key),
         "kakao_js": bool(s.kakao_js_key),
+        "session_secret_ok": len(s.session_secret) >= 32,  # 좋아요·댓글(로그인)에 필요. 값은 내보내지 않는다
+        "social_enabled": s.social_enabled,
         "naver": bool(s.naver_client_id and s.naver_client_secret), "admin_token": bool(s.admin_token),
     }

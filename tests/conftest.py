@@ -8,5 +8,7 @@ def _isolate_llm_env(monkeypatch):
     for k in ("API_KEY", "API_BASE", "API_MODEL", "API_MAX_TOKENS", "RATE_LIMIT"):
         monkeypatch.delenv(k, raising=False)
     from app.ratelimit import limiter
+    from app.social_routes import limiter as social_limiter
 
     limiter.reset()  # 테스트 사이에 요청 횟수가 이어지지 않게
+    social_limiter.reset()

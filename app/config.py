@@ -15,6 +15,9 @@ class Settings:
     kobis_key: str = ""
     kakao_rest_key: str = ""
     kakao_js_key: str = ""  # 카카오맵 JavaScript 키 (브라우저에 공개되는 키. 등록한 도메인에서만 동작)
+    kakao_client_secret: str = ""  # 카카오 로그인 Client Secret (앱에서 사용 설정했을 때만)
+    session_secret: str = ""  # 로그인 쿠키·state 서명 키 (32자 이상 무작위 문자열)
+    site_url: str = ""  # 로그인 Redirect URI의 기준 주소 (예: https://pinpoint-iail.vercel.app). 비우면 요청 주소에서 추정
     naver_client_id: str = ""
     naver_client_secret: str = ""
     naver_api_mode: str = "hub"  # hub(네이버 클라우드 API Hub) | developers(네이버 개발자센터)
@@ -25,6 +28,11 @@ class Settings:
     @property
     def has_store(self) -> bool:
         return bool(self.supabase_url and self.supabase_service_key)
+
+    @property
+    def social_enabled(self) -> bool:
+        """좋아요·댓글(카카오 로그인)에 필요한 설정이 모두 있는가. 하나라도 없으면 화면에서 기능이 숨겨진다."""
+        return bool(self.kakao_rest_key and len(self.session_secret) >= 32 and self.has_store)
 
     @property
     def has_any_connector(self) -> bool:
@@ -41,6 +49,9 @@ def load_settings(env: dict[str, str] | None = None) -> Settings:
         kobis_key=e.get("KOBIS_KEY", ""),
         kakao_rest_key=e.get("KAKAO_REST_KEY", ""),
         kakao_js_key=e.get("KAKAO_JS_KEY", "").strip(),
+        kakao_client_secret=e.get("KAKAO_CLIENT_SECRET", "").strip(),
+        session_secret=e.get("SESSION_SECRET", "").strip(),
+        site_url=e.get("SITE_URL", "").strip().rstrip("/"),
         naver_client_id=e.get("NAVER_CLIENT_ID", ""),
         naver_client_secret=e.get("NAVER_CLIENT_SECRET", ""),
         naver_api_mode=(e.get("NAVER_API_MODE") or "hub").strip().lower(),
