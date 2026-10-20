@@ -159,6 +159,7 @@ def test_prepare_raw_caps_per_category_slims_and_prefers_confident_near():
     spot0 = next(r for r in out if r["category"] == "TRAVEL_SPOT")
     # 사진 URL은 Spot 조립용으로 유지된다 (모델 입력에서는 model_view가 제거)
     assert "id" not in spot0 and "subtitle" not in spot0
+    assert spot0["place_id"].startswith("u")  # DB id는 place_id로 이어진다 (좋아요·댓글의 키)
     assert spot0["extra"] == {"dist_m": 5, "sources": ["tourapi"], "image": "http://x/y.jpg"}
     assert spot0["title"] == "관광19"  # 같은 신뢰도면 가까운 순
     assert len(prepare_raw(rows, per_category=100, max_rows=5)) == 5

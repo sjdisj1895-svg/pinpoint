@@ -1,11 +1,20 @@
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { ReactNode } from "react";
 
 // 3단계 높이 (뷰포트 비율): 접힘 / 중간 / 전체
 const SNAPS = [0.14, 0.5, 0.88];
 
-export default function BottomSheet({ children }: { children: ReactNode }) {
+interface Props {
+  children: ReactNode;
+  overlay?: ReactNode; // 목록 위에 덮는 상세 서랍 (목록의 스크롤 위치는 그대로 남는다)
+  expandKey?: string | null; // 값이 생기면(상세가 열리면) 시트를 가장 높게 펼친다
+}
+
+export default function BottomSheet({ children, overlay, expandKey }: Props) {
   const [snap, setSnap] = useState(1);
+  useEffect(() => {
+    if (expandKey) setSnap(2);
+  }, [expandKey]);
   const [dragH, setDragH] = useState<number | null>(null); // 드래그 중 높이(px)
   const start = useRef<{ y: number; h: number } | null>(null);
   const vh = () => window.innerHeight;
@@ -50,7 +59,10 @@ export default function BottomSheet({ children }: { children: ReactNode }) {
       >
         <span />
       </div>
-      <div className="sheet-body">{children}</div>
+      <div className="sheet-main">
+        <div className="sheet-body">{children}</div>
+        {overlay && <div className="drawer">{overlay}</div>}
+      </div>
     </div>
   );
 }

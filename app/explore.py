@@ -59,7 +59,7 @@ def row_to_spot(row: dict[str, Any], target: date) -> Spot | None:
         attributes=SpotAttributes(vibe_tags=[], admission_fee=NO_INFO, parking_available=None,
                                   indoor_outdoor=io or DEFAULT_INDOOR_OUTDOOR.get(category, IndoorOutdoor.BOTH)),
         source_url=row["source_url"] if _is_http(row.get("source_url")) else "https://map.naver.com/p/search/" + quote(row["title"]),
-        image_url=image_url_of({"extra": extra}),
+        image_url=image_url_of({"extra": extra}), place_id=str(row["id"]),
         confidence_score=float(row.get("confidence") or 0.5),
         verification_note=f"출처: {sources} (AI 검증 전 수집 데이터)",
     )

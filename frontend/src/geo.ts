@@ -73,6 +73,40 @@ export function formatPeriod(spot: Spot): string {
   return start === end ? f(start) : `${f(start)} ~ ${f(end)}`;
 }
 
+// ---------- 월별 필터 (1~12월 체크박스) ----------
+export const MONTHS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12] as const;
+export const currentMonth = (now: Date = new Date()): number => now.getMonth() + 1;
+
+/** 일정(시작~종료)이 걸쳐 있는 달(1~12). 날짜가 없으면(상시·일정 미확인) []. 연도는 가리지 않는다. */
+export function monthsCovered(spot: Spot): number[] {
+  const { start, end } = parsePeriod(spot);
+  if (!start || !end) return [];
+  let [y, m] = start.split("-").map(Number);
+  const [ey, em] = end.split("-").map(Number);
+  const out = new Set<number>();
+  for (let i = 0; i < 24 && (y < ey || (y === ey && m <= em)); i++) {
+    out.add(m);
+    if (++m > 12) {
+      m = 1;
+      y++;
+    }
+  }
+  return [...out];
+}
+
+/** 고른 달 중 하나라도 일정이 걸쳐 있는 항목만. 아무것도 안 골랐으면 전체. 일정이 없는 상시 장소는 월을 고르면 제외된다. */
+export function filterByMonths(items: CardItem[], months: number[]): CardItem[] {
+  if (!months.length) return items;
+  return items.filter((i) => monthsCovered(i.spot).some((m) => months.includes(m)));
+}
+
+/** 달별 행사 개수 (체크박스 옆에 보여 준다) */
+export function monthCounts(items: CardItem[]): Record<number, number> {
+  const counts: Record<number, number> = {};
+  for (const i of items) for (const m of monthsCovered(i.spot)) counts[m] = (counts[m] ?? 0) + 1;
+  return counts;
+}
+
 export function statusLabel(spot: Spot): string {
   const event = spot.category === "FESTIVAL" || spot.category === "FLEA_MARKET";
   switch (spot.schedule.live_status) {

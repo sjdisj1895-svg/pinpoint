@@ -2,10 +2,13 @@ import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from "r
 import { fetchExplore, fetchPipeline, fetchReroute } from "./api";
 import type { Weather } from "./types";
 import BottomSheet from "./BottomSheet";
-import { buildCards, filterByPeriod, filterByQuery, filterByRegion, regionFacets, sortItems } from "./geo";
+import {
+  buildCards, filterByMonths, filterByPeriod, filterByQuery, filterByRegion, monthCounts, regionFacets, sortItems,
+} from "./geo";
 import KakaoMapView from "./KakaoMapView";
 import MapView from "./MapView";
 import { MOCK } from "./mock";
+import PlaceDetail from "./PlaceDetail";
 import Panel, { CategoryChips, MAX_KEYWORD_LENGTH } from "./Panel";
 import { initialState, reducer } from "./store";
 
@@ -82,13 +85,29 @@ export default function App() {
   const queried = useMemo(() => (clientSide ? filterByQuery(base, q) : base), [clientSide, base, q]);
   const regionOptions = useMemo(() => (clientSide ? regionFacets(queried) : state.regions), [clientSide, queried, state.regions]);
 
-  // (키워드·시·군) → 분류 → 시기 → 정렬 순으로 적용한 전체 결과 (지도에는 이 전체가, 목록에는 "더보기" 단위로 보인다)
+  // (키워드·시·군) → 분류 → 월 → 시기 → 정렬 순으로 적용한 전체 결과 (지도에는 이 전체가, 목록에는 "더보기" 단위로 보인다)
+  const candidates = useMemo(() => {
+    const byRegion = clientSide ? filterByRegion(queried, state.region) : queried;
+    return byRegion.filter((c) => state.activeCategories.includes(c.spot.category));
+  }, [clientSide, queried, state.region, state.activeCategories]);
+  const monthCountsMemo = useMemo(() => monthCounts(candidates), [candidates]); // 월 체크박스 옆 개수 (월 필터 적용 전 기준)
   const items = useMemo(() => {
     if (!state.data) return [];
-    const byRegion = clientSide ? filterByRegion(queried, state.region) : queried;
-    const byCategory = byRegion.filter((c) => state.activeCategories.includes(c.spot.category));
-    return sortItems(filterByPeriod(byCategory, state.period), state.sort, state.data.t1.target_region.center_coords);
-  }, [state.data, clientSide, queried, state.region, state.activeCategories, state.period, state.sort]);
+    const byMonth = filterByMonths(candidates, state.months);
+    return sortItems(filterByPeriod(byMonth, state.period), state.sort, state.data.t1.target_region.center_coords);
+  }, [state.data, candidates, state.months, state.period, state.sort]);
+
+  // 선택한 장소(카드나 지도의 핀을 누르면). 필터로 목록에서 빠졌거나 "더보기" 밖에 있어도 상세는 항상 열린다.
+  const selectedItem = useMemo(
+    () => (state.selectedId ? items.find((i) => i.spot.id === state.selectedId) ?? base.find((i) => i.spot.id === state.selectedId) ?? null : null),
+    [state.selectedId, items, base],
+  );
+  useEffect(() => {
+    if (!state.selectedId) return;
+    const onKey = (e: KeyboardEvent) => e.key === "Escape" && dispatch({ type: "select", id: null });
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [state.selectedId]);
   const fitKey = `${q}|${state.region}`; // 검색어·시·군이 바뀌면 지도를 그 결과에 맞춘다 ("|" = 필터 없음)
   const shown = useMemo(() => items.slice(0, state.visible), [items, state.visible]);
   const course = useMemo(
@@ -185,7 +204,11 @@ export default function App() {
       showChips={!mobile}
       mapEngine={mapEngine}
       regionOptions={regionOptions}
+      monthCounts={monthCountsMemo}
     />
+  );
+  const drawer = selectedItem && (
+    <PlaceDetail item={selectedItem} onClose={() => dispatch({ type: "select", id: null })} />
   );
 
   const mapProps = {
@@ -215,13 +238,16 @@ export default function App() {
         <div className="floating-chips">
           <CategoryChips active={state.activeCategories} dispatch={dispatch} />
         </div>
-        <BottomSheet>{panel}</BottomSheet>
+        <BottomSheet overlay={drawer} expandKey={state.selectedId}>{panel}</BottomSheet>
       </div>
     );
   }
   return (
     <div className="app desktop">
-      <aside className="left">{panel}</aside>
+      <aside className="left">
+        <div className="left-scroll">{panel}</div>
+        {drawer && <div className="drawer">{drawer}</div>}
+      </aside>
       <main className="right">{map}</main>
     </div>
   );

@@ -54,6 +54,8 @@ def prepare_raw(rows: list[dict[str, Any]], per_category: int = T2_PER_CATEGORY,
             continue
         count[cat] = count.get(cat, 0) + 1
         slim = {k: v for k, v in r.items() if k not in ("id", "extra", "province") and v not in (None, "", [], {})}
+        if r.get("id"):
+            slim["place_id"] = str(r["id"])  # Spot.place_id로 이어진다 (모델 입력 model_view에는 들어가지 않음)
         extra = {k: v for k, v in (r.get("extra") or {}).items() if k in KEEP_EXTRA and v not in (None, "", [])}
         if extra:
             slim["extra"] = extra

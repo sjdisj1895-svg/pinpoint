@@ -113,6 +113,15 @@ def test_model_view_hides_coords_and_url_but_flags_official():
     assert model_view(0, row())["official_url"] is False  # 지도 검색 링크는 공식 아님
 
 
+def test_place_id_flows_from_raw_to_spot_but_not_to_the_model():
+    r = row("축제", place_id="11111111-2222-3333-4444-555555555555")
+    (s,) = harvest(T1, Provider([r]), FakeClient([dec(0)]))
+    assert s.place_id == "11111111-2222-3333-4444-555555555555"  # 좋아요·댓글이 붙는 안정적인 키
+    assert "place_id" not in model_view(0, r)  # 모델 입력에는 불필요
+    (s2,) = harvest(T1, Provider([row("축제")]), FakeClient([dec(0)]))
+    assert s2.place_id is None  # 실시간 수집(DB 없음)은 키가 없다 → 화면에서 좋아요·댓글 비활성
+
+
 def test_model_view_hides_image_url():
     v = model_view(0, row(extra={"image": "https://tong.visitkorea.or.kr/a.jpg", "sources": ["tourapi"]}))
     assert "image" not in v["extra"] and v["extra"]["sources"] == ["tourapi"]

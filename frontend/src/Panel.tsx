@@ -1,11 +1,10 @@
 import { useState } from "react";
 import type { CSSProperties, Dispatch } from "react";
 import type { Action, State } from "./store";
-import type { CardItem, Category, Course, RegionFacet, Spot, Weather } from "./types";
+import type { CardItem, Category, Course, RegionFacet, Weather } from "./types";
 import type { PeriodFilter, SortKey } from "./geo";
-import {
-  ALL_CATEGORIES, CATEGORY_META, formatPeriod, isMapSearchLink, regionLabel, safeUrl, statusLabel,
-} from "./geo";
+import { ALL_CATEGORIES, CATEGORY_META, MONTHS, currentMonth, formatPeriod, regionLabel, statusLabel } from "./geo";
+import Thumb from "./Thumb";
 
 export function CategoryChips({ active, dispatch }: { active: Category[]; dispatch: Dispatch<Action> }) {
   return (
@@ -105,11 +104,13 @@ const SORTS: { key: SortKey; label: string }[] = [
   { key: "DISTANCE", label: "거리순" },
 ];
 
-function FilterBar({ state, dispatch, total, showChips, regionOptions }: {
+function FilterBar({ state, dispatch, total, showChips, regionOptions, monthCounts }: {
   state: State; dispatch: Dispatch<Action>; total: number; showChips: boolean; regionOptions: RegionFacet[];
+  monthCounts: Record<number, number>;
 }) {
   const sorts = state.mode === "explore" ? SORTS.filter((s) => s.key !== "DISTANCE") : SORTS; // 둘러보기엔 기준점이 없다
-  const filtered = !!(state.region || state.queryInput.trim());
+  const filtered = !!(state.region || state.queryInput.trim() || state.months.length);
+  const thisMonth = currentMonth();
   return (
     <section className="filters" aria-label="필터와 정렬">
       <div className="filter-row">
@@ -141,6 +142,30 @@ function FilterBar({ state, dispatch, total, showChips, regionOptions }: {
           ))}
         </div>
       </div>
+      <fieldset className="months">
+        <legend className="filter-label">월</legend>
+        <div className="month-grid">
+          {MONTHS.map((m) => {
+            const on = state.months.includes(m);
+            const n = monthCounts[m] ?? 0;
+            return (
+              <label key={m} className={`month${on ? " on" : ""}${m === thisMonth ? " now" : ""}${n === 0 && !on ? " empty" : ""}`}
+                title={m === thisMonth ? "이번 달" : undefined}>
+                <input type="checkbox" checked={on} onChange={() => dispatch({ type: "toggleMonth", month: m })} />
+                {m}월<small>{n}</small>
+              </label>
+            );
+          })}
+        </div>
+        {state.months.length > 0 ? (
+          <button className="link small" onClick={() => dispatch({ type: "clearMonths" })}>월 해제</button>
+        ) : (
+          <button className="link small" onClick={() => dispatch({ type: "toggleMonth", month: thisMonth })}>이번 달({thisMonth}월)만</button>
+        )}
+      </fieldset>
+      {state.months.length > 0 && (
+        <p className="hint month-hint">고른 달에 일정이 걸쳐 있는 행사만 보여요. 상시 운영하는 장소는 월을 고르면 빠집니다.</p>
+      )}
       {showChips && (
         <div className="filter-row">
           <span className="filter-label">분류</span>
@@ -223,22 +248,11 @@ function CourseBar({ courses, state, dispatch }: { courses: Course[]; state: Sta
   );
 }
 
-/** 사진이 없거나 불러오지 못하면 카테고리 색 배경 + 이모지로 대체한다 */
-function Thumb({ spot }: { spot: Spot }) {
-  const [failed, setFailed] = useState(false);
-  const meta = CATEGORY_META[spot.category];
-  const src = safeUrl(spot.image_url);
-  if (!src || failed) {
-    return <div className="thumb-fallback" style={{ "--c": meta.color } as CSSProperties} aria-hidden>{meta.emoji}</div>;
-  }
-  return <img src={src} alt="" loading="lazy" referrerPolicy="no-referrer" onError={() => setFailed(true)} />;
-}
-
+/** 카드를 누르면 상세 서랍(PlaceDetail)이 열린다. 지도의 핀을 눌러도 같은 서랍이 열린다. */
 function Card({ item, state, dispatch }: { item: CardItem; state: State; dispatch: Dispatch<Action> }) {
   const { spot } = item;
   const m = CATEGORY_META[spot.category];
   const selected = state.selectedId === spot.id;
-  const url = safeUrl(spot.source_url);
   return (
     <li
       className={`pcard${selected ? " selected" : ""}`}
@@ -246,7 +260,7 @@ function Card({ item, state, dispatch }: { item: CardItem; state: State; dispatc
       onMouseEnter={() => dispatch({ type: "hover", id: spot.id })}
       onMouseLeave={() => dispatch({ type: "hover", id: null })}
     >
-      <button className="pcard-main" onClick={() => dispatch({ type: "select", id: selected ? null : spot.id })} aria-expanded={selected}>
+      <button className="pcard-main" onClick={() => dispatch({ type: "select", id: spot.id })} aria-haspopup="dialog">
         <div className="thumb">
           <Thumb spot={spot} />
           <span className="b-cat">{m.emoji} {m.label}</span>
@@ -257,30 +271,9 @@ function Card({ item, state, dispatch }: { item: CardItem; state: State; dispatc
           <strong>{spot.title}</strong>
           <span className="period">{formatPeriod(spot)}</span>
           <span className="region">📍 {regionLabel(spot)}</span>
-          {item.why && !selected && <p className="why-snippet">💡 {item.why}</p>}
+          {item.why && <p className="why-snippet">💡 {item.why}</p>}
         </div>
       </button>
-      {selected && (
-        <div className="pdetail">
-          <p className="sub">{spot.subtitle}</p>
-          {item.why && <p className="why">💡 {item.why}</p>}
-          {item.tips.length > 0 && <ul>{item.tips.map((t, i) => <li key={i}>{t}</li>)}</ul>}
-          <dl>
-            <dt>주소</dt><dd>{spot.location.address}</dd>
-            <dt>운영</dt><dd>{spot.schedule.operating_hours}</dd>
-            <dt>입장료</dt><dd>{spot.attributes.admission_fee}{spot.attributes.parking_available ? " · 주차 가능" : ""}</dd>
-          </dl>
-          <small className="verify">✔ {spot.verification_note} (신뢰도 {Math.round(spot.confidence_score * 100)}%)</small>
-          {spot.image_url && spot.image_url.includes("visitkorea.or.kr") && (
-            <small className="credit">사진: 한국관광공사 TourAPI</small>
-          )}
-          {url && (
-            <a href={url} target="_blank" rel="noopener noreferrer">
-              {isMapSearchLink(url) ? "지도에서 검색 ↗" : "공식 안내 ↗"}
-            </a>
-          )}
-        </div>
-      )}
     </li>
   );
 }
@@ -298,10 +291,12 @@ interface PanelProps {
   showChips: boolean; // 모바일은 지도 위 플로팅 칩을 쓴다
   mapEngine: "kakao" | "leaflet"; // 쓰고 있는 지도에 맞는 출처를 표기한다
   regionOptions: RegionFacet[]; // 시·군 선택지 (개수 포함)
+  monthCounts: Record<number, number>; // 달별 행사 개수
 }
 
 export default function Panel({
   state, dispatch, items, shown, courses, onAsk, onSample, onReroute, onExplore, showChips, mapEngine, regionOptions,
+  monthCounts,
 }: PanelProps) {
   const keyword = state.queryInput.trim();
   return (
@@ -309,7 +304,8 @@ export default function Panel({
       <Brand state={state} onExplore={onExplore} />
       <SearchBox state={state} dispatch={dispatch} onAsk={onAsk} onSample={onSample} />
       {state.data && (
-        <FilterBar state={state} dispatch={dispatch} total={items.length} showChips={showChips} regionOptions={regionOptions} />
+        <FilterBar state={state} dispatch={dispatch} total={items.length} showChips={showChips} regionOptions={regionOptions}
+          monthCounts={monthCounts} />
       )}
       {state.mode === "search" && <CourseBar courses={courses} state={state} dispatch={dispatch} />}
       {state.mode === "search" && state.data && <RerouteBar disabled={state.loading} onReroute={onReroute} />}

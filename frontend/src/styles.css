@@ -16,7 +16,41 @@ button:focus-visible, input:focus-visible, a:focus-visible { outline: 2px solid 
 
 .app { height: 100%; }
 .app.desktop { display: grid; grid-template-columns: 40% 60%; }
-.left { overflow-y: auto; border-right: 1px solid var(--line); background: var(--bg); }
+.left { position: relative; overflow: hidden; border-right: 1px solid var(--line); background: var(--bg); }
+.left-scroll { height: 100%; overflow-y: auto; }
+/* 장소 상세 서랍: 목록(스크롤 위치 유지) 위에 덮인다. 데스크탑은 왼쪽 패널, 모바일은 바텀시트 안 */
+.drawer { position: absolute; inset: 0; overflow-y: auto; background: var(--bg); z-index: 20; }
+.drawer-inner { min-height: 100%; background: var(--bg); }
+.drawer-top { position: sticky; top: 0; z-index: 2; background: var(--bg); padding: 10px 14px; border-bottom: 1px solid var(--line); }
+.back { border: 0; background: none; font-weight: 700; color: var(--brand); padding: 4px 2px; }
+.drawer-hero { position: relative; aspect-ratio: 16 / 9; background: #e2e8f0; overflow: hidden; }
+.drawer-hero img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.drawer-hero .thumb-fallback { font-size: 64px; }
+.drawer-body { padding: 16px 18px 28px; display: flex; flex-direction: column; gap: 10px; }
+.drawer-body h2 { margin: 0; font-size: 21px; line-height: 1.3; letter-spacing: -.3px; }
+.drawer-sub { margin: 0; color: #334155; font-size: 14px; }
+.drawer-score { margin: 0; font-size: 13px; font-weight: 700; color: var(--brand); }
+.drawer-tips { margin: 0; padding-left: 18px; font-size: 13.5px; line-height: 1.55; }
+.drawer-body dl { margin: 0; display: grid; grid-template-columns: 56px 1fr; gap: 6px 10px; font-size: 13.5px; }
+.drawer-body dt { color: var(--muted); font-size: 12.5px; }
+.drawer-body dd { margin: 0; }
+.drawer-body small { color: var(--muted); line-height: 1.45; }
+.drawer-link { color: var(--brand); font-weight: 700; text-decoration: none; }
+.drawer-link:hover { text-decoration: underline; }
+
+/* ---- 월 필터 (1~12월 체크박스) ---- */
+.months { border: 0; margin: 0; padding: 0; display: flex; align-items: flex-start; gap: 10px; min-width: 0; }
+.months legend { float: left; padding: 0; margin-top: 6px; }
+.month-grid { flex: 1; display: grid; grid-template-columns: repeat(6, 1fr); gap: 5px; }
+.month { position: relative; display: flex; align-items: center; justify-content: center; gap: 3px; padding: 5px 0; border: 1px solid var(--line); border-radius: 8px; background: #fff; font-size: 12.5px; cursor: pointer; user-select: none; }
+.month input { position: absolute; opacity: 0; inset: 0; margin: 0; cursor: pointer; }
+.month small { font-size: 10px; color: var(--muted); }
+.month.on { background: var(--brand); border-color: var(--brand); color: #fff; font-weight: 700; }
+.month.on small { color: #dbe6ff; }
+.month.now:not(.on) { border-color: var(--accent); color: var(--accent); font-weight: 700; }
+.month.empty:not(.on) { color: #94a3b8; background: #f8fafc; }
+.month:focus-within { outline: 2px solid var(--brand); outline-offset: 1px; }
+.month-hint { margin: -4px 0 0; font-size: 12px; }
 .right, .map { height: 100%; width: 100%; }
 .leaflet-container { background: #e9eef5; font-family: inherit; } /* 타일이 늦게 뜰 때 보이는 바탕색 */
 .app.mobile { position: relative; overflow: hidden; }
@@ -146,6 +180,7 @@ button:focus-visible, input:focus-visible, a:focus-visible { outline: 2px solid 
 .sheet.dragging { transition: none; }
 .sheet-handle { padding: 10px 0 4px; display: flex; justify-content: center; touch-action: none; cursor: grab; }
 .sheet-handle span { width: 40px; height: 5px; border-radius: 3px; background: #94a3b8; }
+.sheet-main { position: relative; flex: 1; min-height: 0; display: flex; flex-direction: column; }
 .sheet-body { overflow-y: auto; flex: 1; padding-bottom: env(safe-area-inset-bottom); }
 .app.mobile .cards { grid-template-columns: repeat(2, 1fr); gap: 10px; }
 .app.mobile .pbody { padding: 9px 10px 11px; }

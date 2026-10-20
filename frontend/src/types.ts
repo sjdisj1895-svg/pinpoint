@@ -27,6 +27,7 @@ export interface Spot {
   attributes: { vibe_tags: string[]; admission_fee: string; parking_available: boolean | null; indoor_outdoor: string };
   source_url: string;
   image_url?: string;
+  place_id?: string; // DB 고유 ID. 좋아요·댓글이 붙는 키 (없으면 소셜 기능 비활성)
   confidence_score: number;
   verification_note: string;
 }

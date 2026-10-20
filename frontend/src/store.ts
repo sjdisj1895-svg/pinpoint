@@ -32,6 +32,7 @@ export interface State {
   activeCategories: Category[];
   queryInput: string; // 검색창에 입력 중인 키워드 (내부 검색. AI 호출 없음)
   region: string; // 선택한 시·군 ("" = 전체)
+  months: number[]; // 체크한 달(1~12). 비면 월 필터 없음
   regions: RegionFacet[]; // 둘러보기에서 서버가 알려 준 시·군별 개수
   total: number | null; // 둘러보기에서 한도로 자르기 전 일치 개수
   period: PeriodFilter;
@@ -52,6 +53,7 @@ export const initialState: State = {
   activeCategories: ALL_CATEGORIES,
   queryInput: "",
   region: "",
+  months: [],
   regions: [],
   total: null,
   period: "ALL",
@@ -69,6 +71,8 @@ export type Action =
   | { type: "exploreResults"; data: PipelineResponse; regions: RegionFacet[]; total: number }
   | { type: "setQueryInput"; text: string }
   | { type: "setRegion"; region: string }
+  | { type: "toggleMonth"; month: number }
+  | { type: "clearMonths" }
   | { type: "resetFilters" }
   | { type: "setPeriod"; period: PeriodFilter }
   | { type: "setSort"; sort: SortKey }
@@ -103,6 +107,7 @@ export function reducer(state: State, action: Action): State {
         activeCategories: ALL_CATEGORIES,
         queryInput: "",
         region: "",
+        months: [],
         regions: action.regions ?? [],
         total: action.total ?? action.data.t2.length,
         period: "ALL",
@@ -120,10 +125,17 @@ export function reducer(state: State, action: Action): State {
       return { ...state, queryInput: action.text, visible: PAGE_SIZE };
     case "setRegion":
       return { ...state, region: action.region, visible: PAGE_SIZE };
+    case "toggleMonth": {
+      const on = state.months.includes(action.month);
+      const months = on ? state.months.filter((m) => m !== action.month) : [...state.months, action.month].sort((a, b) => a - b);
+      return { ...state, months, visible: PAGE_SIZE };
+    }
+    case "clearMonths":
+      return { ...state, months: [], visible: PAGE_SIZE };
     case "resetFilters":
       return {
-        ...state, queryInput: "", region: "", period: "ALL", activeCategories: ALL_CATEGORIES, sort: "RECOMMEND",
-        visible: PAGE_SIZE,
+        ...state, queryInput: "", region: "", months: [], period: "ALL", activeCategories: ALL_CATEGORIES,
+        sort: "RECOMMEND", visible: PAGE_SIZE,
       };
     case "setPeriod":
       return { ...state, period: action.period, visible: PAGE_SIZE };
@@ -140,6 +152,7 @@ export function reducer(state: State, action: Action): State {
         mode: "search",
         queryInput: "", // AI에게 물은 문장은 키워드 검색어로 남기지 않는다 (남기면 AI 결과가 그 문장으로 다시 걸러진다)
         region: "",
+        months: [],
         regions: [],
         total: null,
         period: "ALL",

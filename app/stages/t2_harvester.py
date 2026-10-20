@@ -129,7 +129,7 @@ def build_spot(n: int, r: dict[str, Any], d: Decision) -> Spot:
         attributes=SpotAttributes(
             vibe_tags=tags, admission_fee=d.admission_fee, parking_available=d.parking_available,
             indoor_outdoor=raw_io or d.indoor_outdoor or DEFAULT_INDOOR_OUTDOOR.get(category, IndoorOutdoor.BOTH)),
-        source_url=url, image_url=image_url_of(r), confidence_score=d.confidence_score,
+        source_url=url, image_url=image_url_of(r), place_id=r.get("place_id"), confidence_score=d.confidence_score,
         verification_note=d.verification_note,
     )
 

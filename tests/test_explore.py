@@ -43,7 +43,8 @@ def test_regions_json_is_valid_and_gyeongnam_covers_18_cities():
 
 def test_row_to_spot_basics_and_https_image():
     s = row_to_spot(db_row(1), TARGET)
-    assert s.id == "id-1" and s.category == Category.FESTIVAL and s.schedule.live_status.value == "OPEN_NOW"
+    assert s.id == "id-1" and s.place_id == "id-1"
+    assert s.category == Category.FESTIVAL and s.schedule.live_status.value == "OPEN_NOW"
     assert s.image_url == "https://tong.visitkorea.or.kr/cms/resource/1/a.jpg"
     assert s.schedule.period == "2026-10-20 ~ 2026-10-30" and s.source_url.startswith("https://map.naver.com/p/search/")
     assert s.attributes.parking_available is None and "AI 검증 전" in s.verification_note

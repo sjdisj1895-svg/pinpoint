@@ -125,6 +125,7 @@ class Spot(BaseModel):
     attributes: SpotAttributes
     source_url: str
     image_url: str | None = None  # 대표 사진 (한국관광공사 TourAPI 제공 등)
+    place_id: str | None = None  # DB(spots) 고유 ID. 좋아요·댓글이 붙는 안정적인 키 (AI 추천의 spot_001은 요청마다 바뀐다)
     confidence_score: float = Field(ge=0, le=1)
     verification_note: str
 
