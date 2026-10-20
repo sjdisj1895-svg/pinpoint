@@ -1,4 +1,4 @@
--- PinPlay 소셜 기능(카카오 로그인 사용자, 좋아요, 댓글, 신고)
+-- 경남나들이 소셜 기능(카카오 로그인 사용자, 좋아요, 댓글, 신고)
 -- 실행: Supabase SQL Editor에 이 파일 내용을 붙여 넣고 Run (schema.sql을 먼저 실행한 뒤)
 -- 서버(service_role 키)만 접근한다: RLS를 켜고 정책을 만들지 않으며 anon/authenticated 권한은 회수한다.
 

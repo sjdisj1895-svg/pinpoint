@@ -1,4 +1,4 @@
--- PinPlay 공간 DB (Supabase Postgres + PostGIS)
+-- 경남나들이 공간 DB (Supabase Postgres + PostGIS)
 -- 실행: Supabase SQL Editor 또는 `psql -f supabase/schema.sql`
 
 create extension if not exists postgis with schema extensions;

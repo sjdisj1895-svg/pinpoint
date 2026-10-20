@@ -36,7 +36,7 @@ function Brand({ state, onExplore }: { state: State; onExplore: () => void }) {
     <header className="brand">
       <span className="logo" aria-hidden>📍</span>
       <div className="brand-text">
-        <b>PinPlay</b>
+        <b>경남나들이</b>
         <small>경남 로컬 큐레이션</small>
       </div>
       {state.mode === "search" && (

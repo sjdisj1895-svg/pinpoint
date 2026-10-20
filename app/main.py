@@ -48,7 +48,7 @@ async def lifespan(_: FastAPI):
     yield
 
 
-app = FastAPI(title="PinPlay", lifespan=lifespan)
+app = FastAPI(title="경남나들이", lifespan=lifespan)
 api = APIRouter()  # 루트와 /api 양쪽에 노출 (프론트는 /api, 직접 호출은 루트)
 FRONTEND_DIST = Path(__file__).parent.parent / "frontend" / "dist"
 
