@@ -58,7 +58,7 @@ class SocialStore:
 
     def list_comments(self, place_id: str, me: int | None, limit: int = 20, before: str | None = None) -> list[dict[str, Any]]:
         q = (
-            self.client.table("comments").select("id, body, created_at, user_id, users(nickname)")
+            self.client.table("comments").select("id, body, created_at, user_id, users!comments_user_id_fkey(nickname)")
             .eq("place_id", place_id).eq("hidden", False).order("created_at", desc=True).limit(limit)
         )
         if before:
@@ -68,7 +68,7 @@ class SocialStore:
     def add_comment(self, place_id: str, user_id: int, body: str) -> dict[str, Any]:
         row = self.client.table("comments").insert({"place_id": place_id, "user_id": user_id, "body": body}).execute().data[0]
         full = (
-            self.client.table("comments").select("id, body, created_at, user_id, users(nickname)").eq("id", row["id"]).execute().data[0]
+            self.client.table("comments").select("id, body, created_at, user_id, users!comments_user_id_fkey(nickname)").eq("id", row["id"]).execute().data[0]
         )
         return self._comment(full, user_id)
 
@@ -90,7 +90,7 @@ class SocialStore:
     # ---- 관리자 ----
     def admin_reports(self, limit: int = 100) -> list[dict[str, Any]]:
         res = (
-            self.client.table("comments").select("id, place_id, body, reports, hidden, created_at, user_id, users(nickname)")
+            self.client.table("comments").select("id, place_id, body, reports, hidden, created_at, user_id, users!comments_user_id_fkey(nickname)")
             .gt("reports", 0).order("reports", desc=True).limit(limit).execute()
         )
         return res.data or []
